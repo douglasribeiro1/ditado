@@ -4,113 +4,31 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>Bloco de Notas com Ditado (PWA)</title>
-
-<!-- Manifest PWA -->
 <link rel="manifest" href="manifest.json">
-
 <style>
-  :root{
-    --controls-height:60px;
-    --notes-panel-width:360px;
-    --font-size:22px;
-  }
+  :root{--controls-height:60px;--notes-panel-width:360px;--font-size:22px;}
   html,body{height:100%;margin:0;font-family:Arial, Helvetica, sans-serif;background:#f6f7f9;color:#111;overflow:hidden;}
   #app{display:flex;flex-direction:column;height:100vh;box-sizing:border-box;}
   #controls{height:var(--controls-height);display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid #e6e6e6;background:#fff;box-sizing:border-box;}
-  .controls-left{display:flex;gap:8px;align-items:center;}
-  .controls-right{margin-left:auto;display:flex;gap:8px;align-items:center;}
+  .controls-left{display:flex;gap:8px;align-items:center;} .controls-right{margin-left:auto;display:flex;gap:8px;align-items:center;}
   button{padding:8px 12px;font-size:15px;border-radius:6px;border:1px solid #cfcfcf;background:#fff;cursor:pointer;}
-  button.primary{background:#0b5cff;color:#fff;border-color:#0b5cff;}
-  button.warn{background:#111;color:#fff;border-color:#111;}
-  #fontControls{display:flex;align-items:center;gap:6px;}
-  input[type="range"]{width:120px;}
-  #main{display:flex;flex:1 1 auto;min-height:0;}
-  #editor{flex:1 1 auto;display:flex;flex-direction:column;padding:12px;box-sizing:border-box;min-width:0;}
-  #output{
-    width:100%;
-    flex:1 1 auto;
-    font-size:var(--font-size);
-    line-height:1.45;
-    padding:18px;
-    box-sizing:border-box;
-    border:2px solid #ddd;
-    border-radius:8px;
-    resize:none;
-    outline:none;
-    background:#fff;
-    color:#111;
-    overflow:auto;
-    white-space:pre-wrap;
-    font-family: Arial, Helvetica, sans-serif;
-  }
+  button.primary{background:#0b5cff;color:#fff;border-color:#0b5cff;} button.warn{background:#111;color:#fff;border-color:#111;}
+  #fontControls{display:flex;align-items:center;gap:6px;} input[type="range"]{width:120px;}
+  #main{display:flex;flex:1 1 auto;min-height:0;} #editor{flex:1 1 auto;display:flex;flex-direction:column;padding:12px;box-sizing:border-box;min-width:0;}
+  #output{width:100%;flex:1 1 auto;font-size:var(--font-size);line-height:1.45;padding:18px;box-sizing:border-box;border:2px solid #ddd;border-radius:8px;resize:none;outline:none;background:#fff;color:#111;overflow:auto;white-space:pre-wrap;font-family: Arial, Helvetica, sans-serif;}
   #notesPanel{width:0;transition:width .18s ease;overflow:hidden;border-left:1px solid #e6e6e6;background:#fff;display:flex;flex-direction:column;}
-  #notesPanel.open{width:var(--notes-panel-width);}
-  #notesHeader{display:flex;align-items:center;justify-content:space-between;padding:12px;border-bottom:1px solid #eee;}
-  #notesList{padding:12px;overflow:auto;flex:1 1 auto;}
-  .note{padding:10px;border:1px solid #eee;border-radius:6px;margin-bottom:10px;font-size:14px;white-space:pre-wrap;position:relative;}
-  .note .meta{display:block;color:#666;margin-top:8px;font-size:12px;}
-  .note .actions{position:absolute;top:8px;right:8px;display:flex;gap:6px;}
-  .small{font-size:13px;color:#666;}
-  #status{font-size:13px;color:#666;margin-left:12px;}
-  @media (max-width:800px){ #notesPanel.open{width:100%;position:absolute;left:0;top:var(--controls-height);height:calc(100vh - var(--controls-height));z-index:2147483647;} }
+  #notesPanel.open{width:var(--notes-panel-width);} #notesHeader{display:flex;align-items:center;justify-content:space-between;padding:12px;border-bottom:1px solid #eee;}
+  #notesList{padding:12px;overflow:auto;flex:1 1 auto;} .note{padding:10px;border:1px solid #eee;border-radius:6px;margin-bottom:10px;font-size:14px;white-space:pre-wrap;position:relative;}
+  .note .meta{display:block;color:#666;margin-top:8px;font-size:12px;} .note .actions{position:absolute;top:8px;right:8px;display:flex;gap:6px;} .small{font-size:13px;color:#666;}
+  #status{font-size:13px;color:#666;margin-left:12px;} @media (max-width:800px){ #notesPanel.open{width:100%;position:absolute;left:0;top:var(--controls-height);height:calc(100vh - var(--controls-height));z-index:2147483647;} }
 
   /* Overlay de ditado (barra inferior) - menor e rolável */
-  #dictateOverlay{
-    position:fixed;
-    left:12px;
-    right:12px;
-    bottom:12px;
-    height:56px;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    padding:8px 12px;
-    box-sizing:border-box;
-    background:linear-gradient(180deg, rgba(0,0,0,0.35), rgba(0,0,0,0.55));
-    color:#fff;
-    z-index:2147483650;
-    transform:translateY(110%);
-    transition:transform .14s ease, opacity .14s ease;
-    opacity:0;
-    pointer-events:none;
-    font-family: Arial, Helvetica, sans-serif;
-    border-radius:10px;
-  }
+  #dictateOverlay{position:fixed;left:12px;right:12px;bottom:12px;height:56px;display:flex;align-items:center;justify-content:center;padding:8px 12px;box-sizing:border-box;background:linear-gradient(180deg, rgba(0,0,0,0.35), rgba(0,0,0,0.55));color:#fff;z-index:2147483650;transform:translateY(110%);transition:transform .14s ease, opacity .14s ease;opacity:0;pointer-events:none;font-family: Arial, Helvetica, sans-serif;border-radius:10px;}
   #dictateOverlay.open{transform:translateY(0%); opacity:1; pointer-events:auto;}
-  #dictateOverlay .text{
-    font-size:16px;
-    line-height:1.2;
-    max-width:calc(100% - 120px);
-    text-align:left;
-    word-break:break-word;
-    overflow:auto;
-    white-space:nowrap;
-  }
-  /* rolagem suave: esconder barra, mas permitir scroll programático */
-  #dictateOverlay .text::-webkit-scrollbar{height:6px;}
-  #dictateOverlay .hint{
-    position:absolute;
-    left:14px;
-    bottom:6px;
-    font-size:12px;
-    color:rgba(255,255,255,0.85);
-  }
-  #dictateOverlay .spinner{
-    position:absolute;
-    right:14px;
-    bottom:6px;
-    width:12px;
-    height:12px;
-    border-radius:50%;
-    border:2px solid rgba(255,255,255,0.25);
-    border-top-color: #fff;
-    animation:spin 1s linear infinite;
-    opacity:0.95;
-  }
-  @keyframes spin{to{transform:rotate(360deg);}}
-  /* Toggle visual */
-  .toggle {display:inline-flex;align-items:center;gap:6px;padding:6px 8px;border-radius:6px;border:1px solid #ddd;background:#fff;}
-  .toggle input{transform:scale(1.1);}
+  #dictateOverlay .text{font-size:16px;line-height:1.2;max-width:calc(100% - 120px);text-align:left;word-break:break-word;overflow:auto;white-space:nowrap;}
+  #dictateOverlay .text::-webkit-scrollbar{height:6px;} #dictateOverlay .hint{position:absolute;left:14px;bottom:6px;font-size:12px;color:rgba(255,255,255,0.85);}
+  #dictateOverlay .spinner{position:absolute;right:14px;bottom:6px;width:12px;height:12px;border-radius:50%;border:2px solid rgba(255,255,255,0.25);border-top-color: #fff;animation:spin 1s linear infinite;opacity:0.95;}
+  @keyframes spin{to{transform:rotate(360deg);}} .toggle {display:inline-flex;align-items:center;gap:6px;padding:6px 8px;border-radius:6px;border:1px solid #ddd;background:#fff;} .toggle input{transform:scale(1.1);}
 </style>
 </head>
 <body>
@@ -162,7 +80,7 @@
 <!-- Overlay de ditado -->
 <div id="dictateOverlay" aria-hidden="true">
   <div class="text" id="overlayText" aria-live="polite"></div>
-  <div class="hint" id="overlayHint">Pressione Enter para inserir agora</div>
+  <div class="hint" id="overlayHint">Aguardando texto final</div>
   <div class="spinner" id="overlaySpinner" style="display:none"></div>
 </div>
 
@@ -197,10 +115,8 @@ let notes = [];
 const STORAGE_KEY = 'ditado_notes_v2';
 const HISTORY_LIMIT = 300;
 
-/* ====== Estado de interim/consumo ====== */
-let lastInterim = '';           // texto interim atual vindo do recognition
-let lastInsertedInterim = '';   // texto interim que já foi inserido via Enter
-let interimConsumed = false;    // se true, evita duplicação quando final chega
+/* ====== Estado de interim ====== */
+let lastInterim = ''; // texto interim atual vindo do recognition
 
 /* ====== Utilitários ====== */
 function nowLabel(ts){ return new Date(ts).toLocaleString(); }
@@ -231,93 +147,24 @@ function renderNotes(){
 }
 
 /* ====== Autosave ====== */
-function scheduleAutoSave(){
-  clearTimeout(saveTimer);
-  saveTimer = setTimeout(()=> {
-    saveCurrentAsNote();
-  }, autosaveDelay);
-}
-function saveCurrentAsNote(){
-  const text = output.value.trim();
-  if(!text) return;
-  const note = { text, t: Date.now() };
-  notes.unshift(note);
-  persistNotes();
-  renderNotes();
-  status.textContent = 'Salvo';
-  setTimeout(()=> status.textContent = 'Pronto', 1000);
-}
+function scheduleAutoSave(){ clearTimeout(saveTimer); saveTimer = setTimeout(()=> { saveCurrentAsNote(); }, autosaveDelay); }
+function saveCurrentAsNote(){ const text = output.value.trim(); if(!text) return; const note = { text, t: Date.now() }; notes.unshift(note); persistNotes(); renderNotes(); status.textContent = 'Salvo'; setTimeout(()=> status.textContent = 'Pronto', 1000); }
 
 /* ====== History / Undo ====== */
-function pushHistory(value){
-  if(history.length && history[history.length-1] === value) return;
-  history.push(value);
-  if(history.length > HISTORY_LIMIT) history.shift();
-}
-function undo(){
-  if(history.length <= 1) return;
-  history.pop();
-  const prev = history[history.length-1] || '';
-  output.value = prev;
-  output.focus();
-  scheduleAutoSave();
-  status.textContent = 'Desfeito';
-  setTimeout(()=> status.textContent = 'Pronto',700);
-}
+function pushHistory(value){ if(history.length && history[history.length-1] === value) return; history.push(value); if(history.length > HISTORY_LIMIT) history.shift(); }
+function undo(){ if(history.length <= 1) return; history.pop(); const prev = history[history.length-1] || ''; output.value = prev; output.focus(); scheduleAutoSave(); status.textContent = 'Desfeito'; setTimeout(()=> status.textContent = 'Pronto',700); }
 
 /* ====== Notes actions ====== */
-function newNote(){
-  saveCurrentAsNote();
-  output.value = '';
-  history = [''];
-  status.textContent = 'Nova nota';
-  setTimeout(()=> status.textContent = 'Pronto',700);
-}
-function clearEditor(){
-  output.value = '';
-  pushHistory(output.value);
-  status.textContent = 'Limpo';
-  setTimeout(()=> status.textContent = 'Pronto',700);
-}
-function loadNote(idx){
-  const n = notes[idx];
-  if(!n) return;
-  output.value = n.text;
-  history = [n.text];
-  status.textContent = 'Nota carregada';
-  setTimeout(()=> status.textContent = 'Pronto',700);
-}
-function deleteAllNotes(){
-  if(!notes.length) return;
-  if(!confirm('Excluir todas as notas salvas?')) return;
-  notes = [];
-  persistNotes();
-  renderNotes();
-  status.textContent = 'Todas as notas excluídas';
-  setTimeout(()=> status.textContent = 'Pronto',900);
-}
+function newNote(){ saveCurrentAsNote(); output.value = ''; history = ['']; status.textContent = 'Nova nota'; setTimeout(()=> status.textContent = 'Pronto',700); }
+function clearEditor(){ output.value = ''; pushHistory(output.value); status.textContent = 'Limpo'; setTimeout(()=> status.textContent = 'Pronto',700); }
+function loadNote(idx){ const n = notes[idx]; if(!n) return; output.value = n.text; history = [n.text]; status.textContent = 'Nota carregada'; setTimeout(()=> status.textContent = 'Pronto',700); }
+function deleteAllNotes(){ if(!notes.length) return; if(!confirm('Excluir todas as notas salvas?')) return; notes = []; persistNotes(); renderNotes(); status.textContent = 'Todas as notas excluídas'; setTimeout(()=> status.textContent = 'Pronto',900); }
 
 /* ====== Copy ====== */
-async function copyAll(){
-  try{
-    if(navigator.clipboard && navigator.clipboard.writeText){
-      await navigator.clipboard.writeText(output.value);
-    } else {
-      output.select();
-      document.execCommand('copy');
-    }
-    status.textContent = 'Copiado';
-    setTimeout(()=> status.textContent = 'Pronto',900);
-  }catch(e){
-    alert('Falha ao copiar. Selecione e copie manualmente.');
-  }
-}
+async function copyAll(){ try{ if(navigator.clipboard && navigator.clipboard.writeText){ await navigator.clipboard.writeText(output.value); } else { output.select(); document.execCommand('copy'); } status.textContent = 'Copiado'; setTimeout(()=> status.textContent = 'Pronto',900); }catch(e){ alert('Falha ao copiar. Selecione e copie manualmente.'); } }
 
 /* ====== Font controls ====== */
-function setFontSize(px){
-  document.documentElement.style.setProperty('--font-size', px + 'px');
-  fontRange.value = px;
-}
+function setFontSize(px){ document.documentElement.style.setProperty('--font-size', px + 'px'); fontRange.value = px; }
 fontRange.addEventListener('input', ()=> setFontSize(fontRange.value));
 fontInc.addEventListener('click', ()=> setFontSize(Math.min(40, Number(fontRange.value) + 2)));
 fontDec.addEventListener('click', ()=> setFontSize(Math.max(14, Number(fontRange.value) - 2)));
@@ -328,9 +175,20 @@ function closeNotes(){ notesPanel.classList.remove('open'); notesPanel.setAttrib
 function toggleNotes(){ if(notesPanel.classList.contains('open')) closeNotes(); else openNotes(); }
 
 /* ====== Helpers de pontuação ====== */
-function stripPunctuation(s){
-  // remove pontuação comum; mantém letras e números e espaços
-  return s.replace(/[.,!?;:—–\-()\"'«»“”…]/g, '').replace(/\s+/g,' ').trim();
+function stripPunctuation(s){ return s.replace(/[.,!?;:—–\-()\"'«»“”…]/g, '').replace(/\s+/g,' ').trim(); }
+
+/* ====== Decapitalização contextual ====== */
+function decapitalizeIfNeeded(text){
+  if(!text) return text;
+  const prev = output.value.trim();
+  const sentenceEnd = /[.!?]\s*$/.test(prev);
+  if(!autoPunct.checked && !sentenceEnd && prev.length > 0){
+    return text.charAt(0).toLowerCase() + text.slice(1);
+  }
+  if(!autoPunct.checked && !prev){
+    return text.charAt(0).toLowerCase() + text.slice(1);
+  }
+  return text;
 }
 
 /* ====== SpeechRecognition e overlay ====== */
@@ -350,8 +208,6 @@ if(SpeechRecognition){
     status.textContent = 'Gravando...';
     showOverlay('', true);
     lastInterim = '';
-    lastInsertedInterim = '';
-    interimConsumed = false;
   };
 
   recognition.onresult = (e) => {
@@ -366,9 +222,7 @@ if(SpeechRecognition){
     // mostrar interim na overlay (rolável)
     if(interim && interim.trim()){
       lastInterim = interim.trim();
-      interimConsumed = false; // novo interim disponível
       showOverlay(lastInterim, true);
-      // auto-scroll para o fim
       requestAnimationFrame(()=> { overlayText.scrollLeft = overlayText.scrollWidth; });
     } else {
       lastInterim = '';
@@ -381,32 +235,27 @@ if(SpeechRecognition){
       // aplicar opção de pontuação automática
       if(!autoPunct.checked){
         finalText = stripPunctuation(finalText);
+        finalText = decapitalizeIfNeeded(finalText);
+      } else {
+        // quando pontuação ligada, manter como veio
       }
 
-      // Evitar duplicação: se já inserimos o mesmo interim via Enter, substituir o interim inserido pelo final (para adicionar pontuação)
-      const inserted = lastInsertedInterim && finalText.startsWith(lastInsertedInterim);
-      if(inserted){
-        // remover o interim inserido do final do editor e inserir o final completo
-        if(output.value.endsWith(lastInsertedInterim)){
-          output.value = output.value.slice(0, -lastInsertedInterim.length).trimEnd();
-          if(output.value) output.value += ' ';
-          output.value += finalText;
-        } else {
-          // fallback: apenas adicionar final se não estiver presente
-          if(!output.value.endsWith(finalText)) output.value += (output.value && !output.value.endsWith(' ') ? ' ' : '') + finalText;
-        }
-      } else {
-        // se não foi inserido por Enter, apenas adicionar (sem parágrafo automático: espaço)
+      // Substituir interim no fim do editor se presente, evitar duplicação
+      if(lastInterim && output.value.endsWith(lastInterim)){
+        // remove interim e insere final
+        output.value = output.value.slice(0, -lastInterim.length).trimEnd();
+        if(output.value) output.value += ' ';
+        output.value += finalText;
+      } else if(!output.value.endsWith(finalText)){
+        // se final não está duplicado no fim, apenas anexa
         output.value += (output.value && !output.value.endsWith(' ') ? ' ' : '') + finalText;
       }
 
       pushHistory(output.value);
       scheduleAutoSave();
 
-      // limpar estado interim/consumo e overlay
+      // limpar estado interim e overlay
       lastInterim = '';
-      lastInsertedInterim = '';
-      interimConsumed = false;
       hideOverlay();
     }
     output.scrollTop = output.scrollHeight;
@@ -417,8 +266,6 @@ if(SpeechRecognition){
     status.textContent = 'Erro no microfone';
     setTimeout(()=> status.textContent = 'Pronto', 1200);
     lastInterim = '';
-    lastInsertedInterim = '';
-    interimConsumed = false;
     hideOverlay();
   };
 
@@ -427,8 +274,6 @@ if(SpeechRecognition){
     micBtn.textContent = '🎤 Iniciar (Esc)';
     status.textContent = 'Pronto';
     lastInterim = '';
-    lastInsertedInterim = '';
-    interimConsumed = false;
     hideOverlay();
   };
 } else {
@@ -436,14 +281,7 @@ if(SpeechRecognition){
   status.textContent = 'SpeechRecognition não suportado';
 }
 
-function toggleMic(){
-  if(!recognition) return;
-  if(!recognizing){
-    try{ recognition.start(); }catch(e){ console.warn(e); }
-  } else {
-    recognition.stop();
-  }
-}
+function toggleMic(){ if(!recognition) return; if(!recognizing){ try{ recognition.start(); }catch(e){ console.warn(e); } } else { recognition.stop(); } }
 
 /* ====== Overlay helpers ====== */
 function showOverlay(text, showSpinner){
@@ -452,16 +290,9 @@ function showOverlay(text, showSpinner){
   overlay.setAttribute('aria-hidden','false');
   overlaySpinner.style.display = showSpinner ? 'block' : 'none';
   overlayHint.style.display = (text && text.trim()) ? 'block' : 'none';
-  // garantir scroll para o fim
   requestAnimationFrame(()=> { overlayText.scrollLeft = overlayText.scrollWidth; });
 }
-function hideOverlay(){
-  overlay.classList.remove('open');
-  overlay.setAttribute('aria-hidden','true');
-  overlaySpinner.style.display = 'none';
-  overlayHint.style.display = 'none';
-  overlayText.textContent = '';
-}
+function hideOverlay(){ overlay.classList.remove('open'); overlay.setAttribute('aria-hidden','true'); overlaySpinner.style.display = 'none'; overlayHint.style.display = 'none'; overlayText.textContent = ''; }
 
 /* ====== Eventos UI ====== */
 micBtn.addEventListener('click', toggleMic);
@@ -473,70 +304,24 @@ notesToggle.addEventListener('click', toggleNotes);
 closeNotesBtn.addEventListener('click', closeNotes);
 deleteAllBtn.addEventListener('click', deleteAllNotes);
 
-output.addEventListener('input', (e) => {
-  pushHistory(output.value);
-  scheduleAutoSave();
-});
+output.addEventListener('input', (e) => { pushHistory(output.value); scheduleAutoSave(); });
 
 /* ====== Atalhos de teclado ====== */
 window.addEventListener('keydown', (e) => {
-  // Enter durante fala: insere interim imediatamente (uma vez) sem duplicar depois
-  if(e.key === 'Enter' && recognizing && lastInterim && lastInterim.trim()){
-    e.preventDefault();
-    // inserir interim no editor (respeita toggle de pontuação: interim não tem pontuação final ainda)
-    output.value += (output.value && !output.value.endsWith(' ') ? ' ' : '') + lastInterim.trim();
-    pushHistory(output.value);
-    scheduleAutoSave();
-    // marcar como inserido para evitar duplicação quando final chegar
-    lastInsertedInterim = lastInterim.trim();
-    interimConsumed = true;
-    lastInterim = '';
-    hideOverlay();
-    return;
-  }
-
   // Esc -> toggle mic
-  if(e.key === 'Escape'){
-    e.preventDefault();
-    toggleMic();
-    return;
-  }
+  if(e.key === 'Escape'){ e.preventDefault(); toggleMic(); return; }
   // F4 -> copiar
-  if(e.key === 'F4'){
-    e.preventDefault();
-    copyAll();
-    return;
-  }
+  if(e.key === 'F4'){ e.preventDefault(); copyAll(); return; }
   // Ctrl+U -> desfazer (custom)
-  if(e.ctrlKey && (e.key === 'u' || e.key === 'U')){
-    e.preventDefault();
-    undo();
-    return;
-  }
+  if(e.ctrlKey && (e.key === 'u' || e.key === 'U')){ e.preventDefault(); undo(); return; }
   // Ctrl+N -> nova nota
-  if(e.ctrlKey && (e.key === 'n' || e.key === 'N')){
-    e.preventDefault();
-    newNote();
-    return;
-  }
+  if(e.ctrlKey && (e.key === 'n' || e.key === 'N')){ e.preventDefault(); newNote(); return; }
   // Ctrl+L -> limpar editor
-  if(e.ctrlKey && (e.key === 'l' || e.key === 'L')){
-    e.preventDefault();
-    clearEditor();
-    return;
-  }
+  if(e.ctrlKey && (e.key === 'l' || e.key === 'L')){ e.preventDefault(); clearEditor(); return; }
   // Ctrl+M -> abrir/fechar painel de notas
-  if(e.ctrlKey && (e.key === 'm' || e.key === 'M')){
-    e.preventDefault();
-    toggleNotes();
-    return;
-  }
+  if(e.ctrlKey && (e.key === 'm' || e.key === 'M')){ e.preventDefault(); toggleNotes(); return; }
   // Ctrl+Shift+Delete -> excluir todas as notas
-  if(e.ctrlKey && e.shiftKey && e.key === 'Delete'){
-    e.preventDefault();
-    deleteAllNotes();
-    return;
-  }
+  if(e.ctrlKey && e.shiftKey && e.key === 'Delete'){ e.preventDefault(); deleteAllNotes(); return; }
 });
 
 /* ====== Inicialização ====== */
@@ -546,16 +331,11 @@ setFontSize(Number(fontRange.value || 22));
 
 /* ====== PWA: registrar service worker (se disponível) ====== */
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('service-worker.js').then(()=> {
-    console.log('Service worker registrado.');
-  }).catch(err => {
-    console.warn('Falha ao registrar service worker:', err);
-  });
+  navigator.serviceWorker.register('service-worker.js').then(()=> { console.log('Service worker registrado.'); }).catch(err => { console.warn('Falha ao registrar service worker:', err); });
 }
 
 /* ====== Expor para debug ====== */
 window.__ditado = { saveCurrentAsNote, notes, loadNotes, deleteAllNotes };
-
 </script>
 </body>
 </html>
