@@ -469,9 +469,19 @@ function processTranscriptText(text) {
 }
 
 function processFinalSpokenText(rawText, insertPos) {
-  // Processamento unificado para converter números, frações, porcentagens e pontuação falada
+  // Se a pontuação automática estiver DESATIVADA (checkbox desmarcado),
+  // rodamos nosso interpretador manual para converter "dois pontos" em ":", "vírgula" em ",", etc.
+  if (!autoPunct.checked) {
+    return {
+      text: processTranscriptText(rawText),
+      consumedTokens: rawText.split(/\s+/).length
+    };
+  }
+  
+  // Se a pontuação automática estiver ATIVADA (checkbox marcado),
+  // mantemos o texto cru retornado pelo navegador, permitindo que as regras padrão do sistema funcionem.
   return {
-    text: processTranscriptText(rawText),
+    text: rawText,
     consumedTokens: rawText.split(/\s+/).length
   };
 }
