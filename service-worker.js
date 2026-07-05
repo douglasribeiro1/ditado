@@ -2,7 +2,7 @@
 const CACHE_NAME = 'ditado-cache-v2';
 const ASSETS = [
   '.',
-  './ditado.html',
+  './index.html', // Alterado de ./ditado.html para ./index.html
   './manifest.json'
 ];
 
@@ -43,7 +43,7 @@ self.addEventListener('fetch', (event) => {
         }
         return response;
       }).catch(() => {
-        return caches.match('./ditado.html');
+        return caches.match('./index.html'); // Alterado de ./ditado.html para ./index.html
       });
     })
   );
