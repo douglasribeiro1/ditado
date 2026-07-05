@@ -29,6 +29,31 @@
   #dictateOverlay .text::-webkit-scrollbar{height:6px;} #dictateOverlay .hint{position:absolute;left:14px;bottom:6px;font-size:12px;color:rgba(255,255,255,0.85);}
   #dictateOverlay .spinner{position:absolute;right:14px;bottom:6px;width:12px;height:12px;border-radius:50%;border:2px solid rgba(255,255,255,0.25);border-top-color: #fff;animation:spin 1s linear infinite;opacity:0.95;}
   @keyframes spin{to{transform:rotate(360deg);}} .toggle {display:inline-flex;align-items:center;gap:6px;padding:6px 8px;border-radius:6px;border:1px solid #ddd;background:#fff;} .toggle input{transform:scale(1.1);}
+
+  /* Toast central para confirmação de cópia */
+  #toast {
+    position: fixed;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%) scale(0.98);
+    background: rgba(0,0,0,0.85);
+    color: #fff;
+    padding: 12px 18px;
+    border-radius: 10px;
+    font-size: 16px;
+    z-index: 999999;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 160ms ease, transform 160ms ease;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.35);
+    font-family: Arial, Helvetica, sans-serif;
+    display: none;
+  }
+  #toast.show {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+    pointer-events: auto;
+  }
 </style>
 </head>
 <body>
@@ -84,6 +109,9 @@
   <div class="spinner" id="overlaySpinner" style="display:none"></div>
 </div>
 
+<!-- Toast central -->
+<div id="toast" role="status" aria-live="polite" aria-atomic="true">Copiado</div>
+
 <script>
 /* ====== Elementos e estado ====== */
 const output = document.getElementById('output');
@@ -107,6 +135,8 @@ const overlay = document.getElementById('dictateOverlay');
 const overlayText = document.getElementById('overlayText');
 const overlayHint = document.getElementById('overlayHint');
 const overlaySpinner = document.getElementById('overlaySpinner');
+
+const toastEl = document.getElementById('toast');
 
 let saveTimer = null;
 const autosaveDelay = 2000;
@@ -160,8 +190,48 @@ function clearEditor(){ output.value = ''; pushHistory(output.value); status.tex
 function loadNote(idx){ const n = notes[idx]; if(!n) return; output.value = n.text; history = [n.text]; status.textContent = 'Nota carregada'; setTimeout(()=> status.textContent = 'Pronto',700); }
 function deleteAllNotes(){ if(!notes.length) return; if(!confirm('Excluir todas as notas salvas?')) return; notes = []; persistNotes(); renderNotes(); status.textContent = 'Todas as notas excluídas'; setTimeout(()=> status.textContent = 'Pronto',900); }
 
-/* ====== Copy ====== */
-async function copyAll(){ try{ if(navigator.clipboard && navigator.clipboard.writeText){ await navigator.clipboard.writeText(output.value); } else { output.select(); document.execCommand('copy'); } status.textContent = 'Copiado'; setTimeout(()=> status.textContent = 'Pronto',900); }catch(e){ alert('Falha ao copiar. Selecione e copie manualmente.'); } }
+/* ====== Copy (texto puro) e toast ====== */
+let __toastTimer = null;
+function showToast(message = 'Copiado', ms = 900){
+  if(!toastEl) return;
+  toastEl.textContent = message;
+  toastEl.style.display = 'block';
+  void toastEl.offsetWidth;
+  toastEl.classList.add('show');
+  clearTimeout(__toastTimer);
+  __toastTimer = setTimeout(() => {
+    toastEl.classList.remove('show');
+    setTimeout(()=> { toastEl.style.display = 'none'; }, 180);
+  }, ms);
+}
+
+async function copyAll(){
+  try{
+    const textToCopy = output.value || '';
+    if(!textToCopy){
+      showToast('Nada para copiar');
+      return;
+    }
+
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      await navigator.clipboard.writeText(textToCopy);
+    } else {
+      // fallback: selecionar e copiar do textarea (texto puro)
+      output.select();
+      document.execCommand('copy');
+      // remover seleção
+      try { window.getSelection().removeAllRanges(); } catch(e){}
+    }
+
+    showToast('Copiado');
+    status.textContent = 'Copiado';
+    setTimeout(()=> status.textContent = 'Pronto',900);
+  }catch(e){
+    console.error('Erro ao copiar:', e);
+    showToast('Erro ao copiar');
+    alert('Falha ao copiar. Selecione e copie manualmente.');
+  }
+}
 
 /* ====== Font controls ====== */
 function setFontSize(px){ document.documentElement.style.setProperty('--font-size', px + 'px'); fontRange.value = px; }
@@ -236,18 +306,14 @@ if(SpeechRecognition){
       if(!autoPunct.checked){
         finalText = stripPunctuation(finalText);
         finalText = decapitalizeIfNeeded(finalText);
-      } else {
-        // quando pontuação ligada, manter como veio
       }
 
       // Substituir interim no fim do editor se presente, evitar duplicação
       if(lastInterim && output.value.endsWith(lastInterim)){
-        // remove interim e insere final
         output.value = output.value.slice(0, -lastInterim.length).trimEnd();
         if(output.value) output.value += ' ';
         output.value += finalText;
       } else if(!output.value.endsWith(finalText)){
-        // se final não está duplicado no fim, apenas anexa
         output.value += (output.value && !output.value.endsWith(' ') ? ' ' : '') + finalText;
       }
 
