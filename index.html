@@ -347,52 +347,58 @@ function toggleNotes(){ if(notesPanel.classList.contains('open')) closeNotes(); 
 /* ====== Helpers de pontuação ====== */
 function stripPunctuation(s){ return s.replace(/[.,!?;:—–\-()\"'«»“”…]/g, '').replace(/\s+/g,' ').trim(); }
 
-/* ====== Capitalização inteligente ====== */
-function shouldCapitalizeAtPosition(insertPos){
-  const text = output.value;
-  if(insertPos <= 0) return true;
-  const prevChar = text.charAt(insertPos - 1);
-  if(/\r|\n/.test(prevChar)) return true;
-  if(/[.!?]/.test(prevChar)) return true;
-  return false;
-}
-
-function applyCapitalizationRules(finalText, insertPos){
-  if(!finalText) return finalText;
-  if(allCaps.checked) return finalText.toUpperCase();
-
-  if(!autoPunct.checked){
-    const cap = shouldCapitalizeAtPosition(insertPos);
-    if(cap) return finalText.charAt(0).toUpperCase() + finalText.slice(1);
-    return finalText.charAt(0).toLowerCase() + finalText.slice(1);
-  } else {
-    const text = output.value;
-    const prevChar = insertPos > 0 ? text.charAt(insertPos - 1) : '';
-    if(/[.!?]/.test(prevChar) || /\r|\n/.test(prevChar) || insertPos === 0){
-      // fim de frase ou início de parágrafo -> maiúscula
-      return finalText.charAt(0).toUpperCase() + finalText.slice(1);
-    } else if(prevChar){
-      // continuação de frase -> minúscula
-      return finalText.charAt(0).toLowerCase() + finalText.slice(1);
-    }
-    return finalText;
+/* ====== Capitalização e Espaçamento Inteligente ====== */
+/**
+ * Analisa o contexto do texto imediatamente antes do ponto onde o novo texto será inserido.
+ * @param {string} prefix - O texto que precede o cursor de inserção.
+ * @returns {object} Um objeto com as decisões de capitalização e espaçamento.
+ */
+function analyzeInsertionContext(prefix) {
+  const trimmed = prefix.trimEnd();
+  
+  // Caso 1: Início absoluto do documento (documento vazio ou contendo apenas espaços/quebras)
+  if (trimmed.length === 0) {
+    return {
+      capitalize: true,
+      prefixAppend: ""
+    };
   }
+  
+  const trailingWhitespace = prefix.slice(trimmed.length);
+  const hasNewline = /[\r\n]/.test(trailingWhitespace);
+  const lastChar = trimmed.charAt(trimmed.length - 1);
+  
+  // Caso 2: Se houver uma quebra de linha após o último caractere, inicia um novo parágrafo (Letra Maiúscula)
+  if (hasNewline) {
+    return {
+      capitalize: true,
+      prefixAppend: ""
+    };
+  }
+  
+  // Caso 3: Pontuação final/forte (. ! ?) -> Requer Letra Maiúscula e Espaço (se já não houver)
+  if (/[.!?]/.test(lastChar)) {
+    const needsSpace = (trailingWhitespace.length === 0);
+    return {
+      capitalize: true,
+      prefixAppend: needsSpace ? " " : ""
+    };
+  }
+  
+  // Caso 4: Texto contínuo ou pontuação fraca (, ; :) -> Requer Letra Minúscula e Espaço
+  const needsSpace = (trailingWhitespace.length === 0);
+  return {
+    capitalize: false,
+    prefixAppend: needsSpace ? " " : ""
+  };
 }
 
-/* ====== Inserção no cursor (garante espaço após pontuação) ====== */
+/* ====== Inserção no cursor ====== */
 function insertAtCursor(textToInsert){
   const start = output.selectionStart;
   const end = output.selectionEnd;
   const before = output.value.slice(0, start);
   const after = output.value.slice(end);
-
-  // Se o caractere anterior é pontuação final e não há espaço entre ele e o que será inserido,
-  // e o próximo caractere no documento (na posição de inserção) não é espaço, insere um espaço.
-  const prevChar = before.slice(-1);
-  const nextChar = output.value.charAt(start) || '';
-  if(/[.!?]/.test(prevChar) && nextChar !== ' ' && textToInsert.charAt(0) !== ' '){
-    textToInsert = ' ' + textToInsert;
-  }
 
   const newValue = before + textToInsert + after;
   output.value = newValue;
@@ -441,17 +447,33 @@ if(SpeechRecognition){
     if(final && final.trim()){
       let finalText = final.trim();
 
+      // Remove pontuação gerada pelo reconhecimento se a pontuação automática estiver desligada
       if(!autoPunct.checked){
         finalText = stripPunctuation(finalText);
       }
 
-      // determine insertion position at the moment final arrives
+      // Determina a posição de inserção no cursor no momento de chegada do texto final
       const insertPos = (typeof output.selectionStart === 'number') ? output.selectionStart : output.value.length;
+      const before = output.value.slice(0, insertPos);
 
-      // apply capitalization rules
-      finalText = applyCapitalizationRules(finalText, insertPos);
+      // Executa a análise inteligente de contexto (pontuações manuais ou automáticas anteriores)
+      const context = analyzeInsertionContext(before);
 
-      // ensure space after punctuation if needed is handled inside insertAtCursor
+      // Aplica as regras de capitalização obtidas pela análise
+      if(allCaps.checked){
+        finalText = finalText.toUpperCase();
+      } else {
+        if(context.capitalize){
+          finalText = finalText.charAt(0).toUpperCase() + finalText.slice(1);
+        } else {
+          finalText = finalText.charAt(0).toLowerCase() + finalText.slice(1);
+        }
+      }
+
+      // Adiciona o espaçamento inteligente adequado antes de inserir
+      finalText = context.prefixAppend + finalText;
+
+      // Realiza a inserção no campo de texto
       insertAtCursor(finalText);
 
       if(currentNoteIndex !== null && notes[currentNoteIndex]){
