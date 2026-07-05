@@ -5,11 +5,13 @@
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>Bloco de Notas com Ditado (PWA)</title>
 
-<link rel="manifest" href="manifest.json">
+<!-- Manifest -->
+<link rel="manifest" href="/manifest.json">
 
-<!-- favicon embutido (data URI) -->
-<link rel="icon" type="image/svg+xml" href='data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect rx="64" width="512" height="512" fill="%230b5cff"/><g transform="translate(64,64)" fill="%23fff"><rect x="0" y="0" width="384" height="48" rx="8"/><rect x="0" y="72" width="384" height="240" rx="12"/><rect x="0" y="336" width="384" height="48" rx="8"/><circle cx="320" cy="264" r="28" fill="%230b5cff"/></g></svg>'>
-
+<!-- Ícones (usar arquivos reais em /icons/) -->
+<link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="/icons/icon-512.png">
+<link rel="shortcut icon" href="/icons/icon.png">
 <meta name="theme-color" content="#0b5cff">
 
 <style>
@@ -135,7 +137,7 @@ const autosaveDelay = 2000;
 let history = [];
 let redoStack = [];
 let notes = [];
-const STORAGE_KEY = 'ditado_notes_v2';
+const STORAGE_KEY = 'ditado_notes_v3';
 const HISTORY_LIMIT = 300;
 
 /* ====== Estado de interim e nota atual ====== */
@@ -563,7 +565,7 @@ setFontSize(Number(fontRange.value || 22));
 
 /* ====== PWA: registrar service worker (se disponível) ====== */
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('service-worker.js').then(()=> { console.log('Service worker registrado.'); }).catch(err => { console.warn('Falha ao registrar service worker:', err); });
+  navigator.serviceWorker.register('/service-worker.js').then(()=> { console.log('Service worker registrado.'); }).catch(err => { console.warn('Falha ao registrar service worker:', err); });
 }
 
 /* ====== Expor para debug ====== */
