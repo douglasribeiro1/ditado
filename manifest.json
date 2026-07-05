@@ -1,25 +1,28 @@
 {
   "name": "Bloco de Notas com Ditado",
   "short_name": "Ditado",
-  "start_url": "ditado.html",
+  "start_url": "/ditado.html",
   "display": "standalone",
   "background_color": "#f6f7f9",
   "theme_color": "#0b5cff",
   "icons": [
     {
-      "src": "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect rx='64' width='512' height='512' fill='%230b5cff'/><g transform='translate(64,64)' fill='%23fff'><rect x='0' y='0' width='384' height='48' rx='8'/><rect x='0' y='72' width='384' height='240' rx='12'/><rect x='0' y='336' width='384' height='48' rx='8'/><circle cx='320' cy='264' r='28' fill='%230b5cff'/></g></svg>",
-      "sizes": "any",
-      "type": "image/svg+xml"
-    },
-    {
-      "src": "https://upload.wikimedia.org/wikipedia/commons/6/6a/JavaScript-logo.png",
+      "src": "/icons/icon-192.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
     },
     {
-      "src": "https://upload.wikimedia.org/wikipedia/commons/6/6a/JavaScript-logo.png",
+      "src": "/icons/icon-512.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon.png",
+      "sizes": "any",
+      "type": "image/png",
+      "purpose": "any"
     }
   ]
 }
