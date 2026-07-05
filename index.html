@@ -1,17 +1,13 @@
+--- START OF FILE index.html ---
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>Bloco de Notas com Ditado (PWA)</title>
-
-<link rel="manifest" href="manifest.json">
-
-<!-- favicon embutido (data URI) -->
+<link rel="manifest" href="/manifest.json">
 <link rel="icon" type="image/svg+xml" href='data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect rx="64" width="512" height="512" fill="%230b5cff"/><g transform="translate(64,64)" fill="%23fff"><rect x="0" y="0" width="384" height="48" rx="8"/><rect x="0" y="72" width="384" height="240" rx="12"/><rect x="0" y="336" width="384" height="48" rx="8"/><circle cx="320" cy="264" r="28" fill="%230b5cff"/></g></svg>'>
-
 <meta name="theme-color" content="#0b5cff">
-
 <style>
   :root{--controls-height:60px;--notes-panel-width:360px;--font-size:22px;}
   html,body{height:100%;margin:0;font-family:Arial, Helvetica, sans-serif;background:#f6f7f9;color:#111;overflow:hidden;}
@@ -28,7 +24,6 @@
   #notesList{padding:12px;overflow:auto;flex:1 1 auto;} .note{padding:10px;border:1px solid #eee;border-radius:6px;margin-bottom:10px;font-size:14px;white-space:pre-wrap;position:relative;}
   .note .meta{display:block;color:#666;margin-top:8px;font-size:12px;} .note .actions{position:absolute;top:8px;right:8px;display:flex;gap:6px;} .small{font-size:13px;color:#666;}
   #status{font-size:13px;color:#666;margin-left:12px;} @media (max-width:800px){ #notesPanel.open{width:100%;position:absolute;left:0;top:var(--controls-height);height:calc(100vh - var(--controls-height));z-index:2147483647;} }
-
   #dictateOverlay{position:fixed;left:12px;right:12px;bottom:12px;height:56px;display:flex;align-items:center;justify-content:center;padding:8px 12px;box-sizing:border-box;background:linear-gradient(180deg, rgba(0,0,0,0.35), rgba(0,0,0,0.55));color:#fff;z-index:2147483650;transform:translateY(110%);transition:transform .14s ease, opacity .14s ease;opacity:0;pointer-events:none;font-family: Arial, Helvetica, sans-serif;border-radius:10px;}
   #dictateOverlay.open{transform:translateY(0%); opacity:1; pointer-events:auto;}
   #dictateOverlay .text{font-size:16px;line-height:1.2;max-width:calc(100% - 120px);text-align:left;word-break:break-word;overflow:auto;white-space:nowrap;}
@@ -49,7 +44,6 @@
       <button id="redoBtn" title="Ctrl+Y">↪️ Refazer (Ctrl+Y)</button>
       <button id="newBtn" title="F9 para nova nota">📝 Nova Nota (F9)</button>
       <button id="clearBtn" class="warn" title="Ctrl+L">🧹 Limpar (Ctrl+L)</button>
-
       <div id="fontControls" aria-hidden="false">
         <label for="fontRange" class="small" style="margin-left:8px;">Tamanho</label>
         <button id="fontDec">A-</button>
@@ -57,18 +51,15 @@
         <button id="fontInc">A+</button>
       </div>
     </div>
-
     <div class="controls-right">
       <label class="toggle" title="Pontuação automática">
         <input type="checkbox" id="autoPunct" checked />
         <span>Pontuação automática</span>
       </label>
-
       <label class="toggle" title="Caixa alta para ditado">
         <input type="checkbox" id="allCaps" />
         <span>Caixa alta</span>
       </label>
-
       <button id="notesToggle" title="Ctrl+M">📚 Notas (Ctrl+M)</button>
       <div id="status" aria-live="polite">Pronto</div>
     </div>
@@ -92,14 +83,12 @@
   </div>
 </div>
 
-<!-- Overlay de ditado -->
 <div id="dictateOverlay" aria-hidden="true">
   <div class="text" id="overlayText" aria-live="polite"></div>
   <div class="hint" id="overlayHint">Aguardando texto final</div>
   <div class="spinner" id="overlaySpinner" style="display:none"></div>
 </div>
 
-<!-- Toast central -->
 <div id="toast" role="status" aria-live="polite" aria-atomic="true">Copiado</div>
 
 <script>
@@ -135,219 +124,359 @@ const autosaveDelay = 2000;
 let history = [];
 let redoStack = [];
 let notes = [];
-const STORAGE_KEY = 'ditado_notes_v2';
+const STORAGE_KEY = 'ditado_notes_v3';
 const HISTORY_LIMIT = 300;
-
-/* ====== Estado de interim e nota atual ====== */
 let lastInterim = '';
 let currentNoteIndex = null;
 const MAX_NOTES = 500;
 
-/* ====== Utilitários ====== */
+/* ====== Utilitários básicos ====== */
 function nowLabel(ts){ return new Date(ts).toLocaleString(); }
 function persistNotes(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(notes)); }
 function loadNotes(){ try{ notes = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }catch(e){ notes = []; } renderNotes(); }
-function renderNotes(){
-  notesList.innerHTML = '';
-  if(notes.length === 0){ notesList.innerHTML = '<div class="small" style="padding:12px;color:#666">Nenhuma nota salva</div>'; return; }
-  notes.forEach((n, idx) => {
-    const el = document.createElement('div');
-    el.className = 'note';
-    el.dataset.idx = idx;
-    const actions = document.createElement('div'); actions.className = 'actions';
-    const loadBtn = document.createElement('button'); loadBtn.title='Carregar nota'; loadBtn.textContent='Abrir';
-    const delBtn = document.createElement('button'); delBtn.title='Excluir nota'; delBtn.textContent='Excluir';
-    actions.appendChild(loadBtn); actions.appendChild(delBtn);
-    el.appendChild(actions);
-    const textNode = document.createElement('div'); textNode.textContent = n.text.length > 800 ? n.text.slice(0,800) + '…' : n.text;
-    el.appendChild(textNode);
-    const meta = document.createElement('div'); meta.className='meta'; meta.textContent = nowLabel(n.t);
-    el.appendChild(meta);
+function renderNotes(){ notesList.innerHTML=''; if(notes.length===0){ notesList.innerHTML='<div class="small" style="padding:12px;color:#666">Nenhuma nota salva</div>'; return; } notes.forEach((n,idx)=>{ const el=document.createElement('div'); el.className='note'; el.dataset.idx=idx; const actions=document.createElement('div'); actions.className='actions'; const loadBtn=document.createElement('button'); loadBtn.title='Carregar nota'; loadBtn.textContent='Abrir'; const delBtn=document.createElement('button'); delBtn.title='Excluir nota'; delBtn.textContent='Excluir'; actions.appendChild(loadBtn); actions.appendChild(delBtn); el.appendChild(actions); const textNode=document.createElement('div'); textNode.textContent = n.text.length>800 ? n.text.slice(0,800)+'…' : n.text; el.appendChild(textNode); const meta=document.createElement('div'); meta.className='meta'; meta.textContent=nowLabel(n.t); el.appendChild(meta); loadBtn.addEventListener('click', ()=>{ loadNote(idx); closeNotes(); }); delBtn.addEventListener('click', ()=>{ if(!confirm('Excluir esta nota?')) return; if(currentNoteIndex!==null){ if(idx===currentNoteIndex){ currentNoteIndex=null; } else if(idx<currentNoteIndex){ currentNoteIndex=currentNoteIndex-1; } } notes.splice(idx,1); persistNotes(); renderNotes(); status.textContent='Nota excluída'; setTimeout(()=>status.textContent='Pronto',900); }); notesList.appendChild(el); }); }
 
-    loadBtn.addEventListener('click', ()=> { loadNote(idx); closeNotes(); });
-    delBtn.addEventListener('click', ()=> {
-      if(!confirm('Excluir esta nota?')) return;
-      if(currentNoteIndex !== null){
-        if(idx === currentNoteIndex){
-          currentNoteIndex = null;
-        } else if(idx < currentNoteIndex){
-          currentNoteIndex = currentNoteIndex - 1;
-        }
-      }
-      notes.splice(idx,1);
-      persistNotes();
-      renderNotes();
-      status.textContent='Nota excluída';
-      setTimeout(()=>status.textContent='Pronto',900);
-    });
+/* ====== Salvamento automático ====== */
+function scheduleAutoSave(){ clearTimeout(saveTimer); saveTimer = setTimeout(()=> saveCurrentAsNote(), autosaveDelay); }
+function saveCurrentAsNote(){ const text = output.value.trim(); if(!text) return; if(currentNoteIndex!==null && notes[currentNoteIndex]){ if(notes[currentNoteIndex].text===text) return; notes[currentNoteIndex].text=text; notes[currentNoteIndex].t=Date.now(); persistNotes(); renderNotes(); status.textContent='Salvo'; setTimeout(()=>status.textContent='Pronto',900); return; } if(notes.length>0 && notes[0].text===text){ notes[0].t=Date.now(); persistNotes(); renderNotes(); currentNoteIndex=0; status.textContent='Salvo'; setTimeout(()=>status.textContent='Pronto',900); return; } notes.unshift({text,t:Date.now()}); if(notes.length>MAX_NOTES) notes.length=MAX_NOTES; persistNotes(); renderNotes(); currentNoteIndex=0; status.textContent='Salvo'; setTimeout(()=>status.textContent='Pronto',900); }
 
-    notesList.appendChild(el);
-  });
-}
+/* ====== Histórico ====== */
+function pushHistory(value){ if(history.length && history[history.length-1]===value) return; history.push(value); if(history.length>HISTORY_LIMIT) history.shift(); redoStack=[]; }
+function undo(){ if(history.length<=1) return; const cur=history.pop(); redoStack.push(cur); const prev=history[history.length-1]||''; output.value=prev; output.focus(); scheduleAutoSave(); status.textContent='Desfeito'; setTimeout(()=>status.textContent='Pronto',700); }
+function redo(){ if(redoStack.length===0) return; const next=redoStack.pop(); output.value=next; pushHistory(next); output.focus(); scheduleAutoSave(); status.textContent='Refeito'; setTimeout(()=>status.textContent='Pronto',700); }
 
-/* ====== Salvamento automático (atualiza nota existente) ====== */
-function scheduleAutoSave(){ clearTimeout(saveTimer); saveTimer = setTimeout(()=> { saveCurrentAsNote(); }, autosaveDelay); }
+/* ====== Notas / UI helpers ====== */
+function newNote(){ saveCurrentAsNote(); output.value=''; history=['']; redoStack=[]; currentNoteIndex=null; status.textContent='Nova nota'; setTimeout(()=>status.textContent='Pronto',700); }
+function clearEditor(){ output.value=''; pushHistory(output.value); currentNoteIndex=null; status.textContent='Limpo'; setTimeout(()=>status.textContent='Pronto',700); }
+function loadNote(idx){ const n=notes[idx]; if(!n) return; output.value=n.text; history=[n.text]; redoStack=[]; currentNoteIndex=idx; status.textContent='Nota carregada'; setTimeout(()=>status.textContent='Pronto',700); }
+function deleteAllNotes(){ if(!notes.length) return; if(!confirm('Excluir todas as notas salvas?')) return; notes=[]; persistNotes(); renderNotes(); currentNoteIndex=null; status.textContent='Todas as notas excluídas'; setTimeout(()=>status.textContent='Pronto',900); }
 
-function saveCurrentAsNote(){
-  const text = output.value.trim();
-  if(!text) return;
-
-  if(currentNoteIndex !== null && notes[currentNoteIndex]){
-    if(notes[currentNoteIndex].text === text) return;
-    notes[currentNoteIndex].text = text;
-    notes[currentNoteIndex].t = Date.now();
-    persistNotes();
-    renderNotes();
-    status.textContent = 'Salvo';
-    setTimeout(()=> status.textContent = 'Pronto', 900);
-    return;
-  }
-
-  if(notes.length > 0 && notes[0].text === text){
-    notes[0].t = Date.now();
-    persistNotes();
-    renderNotes();
-    currentNoteIndex = 0;
-    status.textContent = 'Salvo';
-    setTimeout(()=> status.textContent = 'Pronto', 900);
-    return;
-  }
-
-  notes.unshift({ text, t: Date.now() });
-  if(notes.length > MAX_NOTES) notes.length = MAX_NOTES;
-  persistNotes();
-  renderNotes();
-  currentNoteIndex = 0;
-  status.textContent = 'Salvo';
-  setTimeout(()=> status.textContent = 'Pronto', 900);
-}
-
-/* ====== Histórico / Desfazer / Refazer ====== */
-function pushHistory(value){
-  if(history.length && history[history.length-1] === value) return;
-  history.push(value);
-  if(history.length > HISTORY_LIMIT) history.shift();
-  redoStack = [];
-}
-function undo(){
-  if(history.length <= 1) return;
-  const cur = history.pop();
-  redoStack.push(cur);
-  const prev = history[history.length-1] || '';
-  output.value = prev;
-  output.focus();
-  scheduleAutoSave();
-  status.textContent = 'Desfeito';
-  setTimeout(()=> status.textContent = 'Pronto',700);
-}
-function redo(){
-  if(redoStack.length === 0) return;
-  const next = redoStack.pop();
-  output.value = next;
-  pushHistory(next);
-  output.focus();
-  scheduleAutoSave();
-  status.textContent = 'Refeito';
-  setTimeout(()=> status.textContent = 'Pronto',700);
-}
-
-/* ====== Notas: nova, carregar, limpar, excluir todas ====== */
-function newNote(){
-  saveCurrentAsNote();
-  output.value = '';
-  history = [''];
-  redoStack = [];
-  currentNoteIndex = null;
-  status.textContent = 'Nova nota';
-  setTimeout(()=> status.textContent = 'Pronto',700);
-}
-
-function clearEditor(){
-  output.value = '';
-  pushHistory(output.value);
-  currentNoteIndex = null;
-  status.textContent = 'Limpo';
-  setTimeout(()=> status.textContent = 'Pronto',700);
-}
-
-function loadNote(idx){
-  const n = notes[idx];
-  if(!n) return;
-  output.value = n.text;
-  history = [n.text];
-  redoStack = [];
-  currentNoteIndex = idx;
-  status.textContent = 'Nota carregada';
-  setTimeout(()=> status.textContent = 'Pronto',700);
-}
-
-function deleteAllNotes(){
-  if(!notes.length) return;
-  if(!confirm('Excluir todas as notas salvas?')) return;
-  notes = [];
-  persistNotes();
-  renderNotes();
-  currentNoteIndex = null;
-  status.textContent = 'Todas as notas excluídas';
-  setTimeout(()=> status.textContent = 'Pronto',900);
-}
-
-/* ====== Copy (texto puro) e toast ====== */
-let __toastTimer = null;
-function showToast(message = 'Copiado', ms = 900){
-  if(!toastEl) return;
-  toastEl.textContent = message;
-  toastEl.style.display = 'block';
-  void toastEl.offsetWidth;
-  toastEl.classList.add('show');
-  clearTimeout(__toastTimer);
-  __toastTimer = setTimeout(() => {
-    toastEl.classList.remove('show');
-    setTimeout(()=> { toastEl.style.display = 'none'; }, 180);
-  }, ms);
-}
-
-async function copyAll(){
-  try{
-    const textToCopy = output.value || '';
-    if(!textToCopy){
-      showToast('Nada para copiar');
-      return;
-    }
-
-    if(navigator.clipboard && navigator.clipboard.writeText){
-      await navigator.clipboard.writeText(textToCopy);
-    } else {
-      output.select();
-      document.execCommand('copy');
-      try { window.getSelection().removeAllRanges(); } catch(e){}
-    }
-
-    showToast('Copiado');
-    status.textContent = 'Copiado';
-    setTimeout(()=> status.textContent = 'Pronto',900);
-  }catch(e){
-    console.error('Erro ao copiar:', e);
-    showToast('Erro ao copiar');
-    alert('Falha ao copiar. Selecione e copie manualmente.');
-  }
-}
+/* ====== Copy / Toast ====== */
+let __toastTimer=null;
+function showToast(message='Copiado', ms=900){ if(!toastEl) return; toastEl.textContent=message; toastEl.style.display='block'; void toastEl.offsetWidth; toastEl.classList.add('show'); clearTimeout(__toastTimer); __toastTimer=setTimeout(()=>{ toastEl.classList.remove('show'); setTimeout(()=>{ toastEl.style.display='none'; },180); }, ms); }
+async function copyAll(){ try{ const textToCopy = output.value || ''; if(!textToCopy){ showToast('Nada para copiar'); return; } if(navigator.clipboard && navigator.clipboard.writeText){ await navigator.clipboard.writeText(textToCopy); } else { output.select(); document.execCommand('copy'); try{ window.getSelection().removeAllRanges(); }catch(e){} } showToast('Copiado'); status.textContent='Copiado'; setTimeout(()=>status.textContent='Pronto',900); }catch(e){ console.error('Erro ao copiar:', e); showToast('Erro ao copiar'); alert('Falha ao copiar. Selecione e copie manualmente.'); } }
 
 /* ====== Font controls ====== */
-function setFontSize(px){ document.documentElement.style.setProperty('--font-size', px + 'px'); fontRange.value = px; }
+function setFontSize(px){ document.documentElement.style.setProperty('--font-size', px+'px'); fontRange.value=px; }
 fontRange.addEventListener('input', ()=> setFontSize(fontRange.value));
-fontInc.addEventListener('click', ()=> setFontSize(Math.min(40, Number(fontRange.value) + 2)));
-fontDec.addEventListener('click', ()=> setFontSize(Math.max(14, Number(fontRange.value) - 2)));
+fontInc.addEventListener('click', ()=> setFontSize(Math.min(40, Number(fontRange.value)+2)));
+fontDec.addEventListener('click', ()=> setFontSize(Math.max(14, Number(fontRange.value)-2)));
 
-/* ====== Notes panel toggle ====== */
-function openNotes(){ notesPanel.classList.add('open'); notesPanel.setAttribute('aria-hidden','false'); }
-function closeNotes(){ notesPanel.classList.remove('open'); notesPanel.setAttribute('aria-hidden','true'); }
-function toggleNotes(){ if(notesPanel.classList.contains('open')) closeNotes(); else openNotes(); }
+/* ====== Pontuação falada, números e datas ====== */
 
-/* ====== Helpers de pontuação ====== */
-function stripPunctuation(s){ return s.replace(/[.,!?;:—–\-()\"'«»“”…]/g, '').replace(/\s+/g,' ').trim(); }
+const UNITS = {
+  'zero':0,'um':1,'uma':1,'dois':2,'duas':2,'tres':3,'três':3,'quatro':4,'cinco':5,'seis':6,'sete':7,'oito':8,'nove':9,'dez':10,'onze':11,'doze':12,'treze':13,'catorze':14,'quatorze':14,'quinze':15,'dezesseis':16,'dezasseis':16,'dezessete':17,'dezassete':17,'dezoito':18,'dezenove':19
+};
+const TENS = {'vinte':20,'trinta':30,'quarenta':40,'cinquenta':50,'sessenta':60,'setenta':70,'oitenta':80,'noventa':90};
+const HUNDREDS = {'cem':100,'cento':100,'duzentos':200,'trezentos':300,'quatrocentos':400,'quinhentos':500,'seiscentos':600,'setecentos':700,'oitocentos':800,'novecentos':900};
+const MONTHS = {
+  'janeiro': 1, 'fevereiro': 2, 'março': 3, 'marco': 3, 'abril': 4, 'maio': 5, 'junho': 6,
+  'julho': 7, 'agosto': 8, 'setembro': 9, 'outubro': 10, 'novembro': 11, 'dezembro': 12
+};
 
-/* ====== Capitalização inteligente ====== */
+const PUNCT_PHRASES = [
+  { words: ['ponto', 'e', 'vírgula'], symbol: ';' },
+  { words: ['ponto', 'e', 'virgula'], symbol: ';' },
+  { words: ['dois', 'pontos'], symbol: ':' },
+  { words: ['ponto', 'final'], symbol: '.' },
+  { words: ['ponto'], symbol: '.' },
+  { words: ['vírgula'], symbol: ',' },
+  { words: ['virgula'], symbol: ',' },
+  { words: ['ponto', 'de', 'interrogação'], symbol: '?' },
+  { words: ['ponto', 'de', 'interrogacao'], symbol: '?' },
+  { words: ['ponto', 'de', 'exclamação'], symbol: '!' },
+  { words: ['ponto', 'de', 'exclamacao'], symbol: '!' },
+  { words: ['abre', 'parênteses'], symbol: '(' },
+  { words: ['abre', 'parenteses'], symbol: '(' },
+  { words: ['fecha', 'parênteses'], symbol: ')' },
+  { words: ['fecha', 'parenteses'], symbol: ')' },
+  { words: ['travessão'], symbol: '—' },
+  { words: ['travessao'], symbol: '—' },
+  { words: ['hífen'], symbol: '-' },
+  { words: ['hifen'], symbol: '-' },
+  { words: ['aspas'], symbol: '"' },
+  { words: ['barra'], symbol: '/' },
+  { words: ['barra', 'invertida'], symbol: '\\' }
+];
+
+function tryParseNumber(tokens, start) {
+  let i = start;
+  let total = 0;
+  let currentGroup = 0;
+  let foundAny = false;
+
+  while (i < tokens.length) {
+    const rawW = tokens[i];
+    const w = rawW.toLowerCase().replace(/[^a-záéíóúçâêôãõ]/g, '');
+
+    const numValue = parseInt(w, 10);
+    if (!isNaN(numValue)) {
+      currentGroup += numValue;
+      foundAny = true;
+      i++;
+      continue;
+    }
+
+    if (UNITS[w] !== undefined) {
+      currentGroup += UNITS[w];
+      foundAny = true;
+      i++;
+      continue;
+    }
+
+    if (TENS[w] !== undefined) {
+      currentGroup += TENS[w];
+      foundAny = true;
+      if (i + 2 < tokens.length && tokens[i+1].toLowerCase() === 'e') {
+        const nextW = tokens[i+2].toLowerCase().replace(/[^a-záéíóúçâêôãõ]/g, '');
+        if (UNITS[nextW] !== undefined) {
+          currentGroup += UNITS[nextW];
+          i += 3;
+          continue;
+        }
+      }
+      i++;
+      continue;
+    }
+
+    if (HUNDREDS[w] !== undefined) {
+      currentGroup += HUNDREDS[w];
+      foundAny = true;
+      if (i + 1 < tokens.length && tokens[i+1].toLowerCase() === 'e') {
+        i += 2;
+      } else {
+        i++;
+      }
+      continue;
+    }
+
+    if (w === 'mil') {
+      if (!foundAny) currentGroup = 1;
+      total += currentGroup * 1000;
+      currentGroup = 0;
+      foundAny = true;
+      i++;
+      continue;
+    }
+
+    if (w === 'milhão' || w === 'milhões' || w === 'milhao' || w === 'milhoes') {
+      if (!foundAny) currentGroup = 1;
+      total += currentGroup * 1000000;
+      currentGroup = 0;
+      foundAny = true;
+      i++;
+      continue;
+    }
+
+    break;
+  }
+
+  total += currentGroup;
+
+  if (foundAny) {
+    return { value: total, consumed: i - start };
+  }
+  return null;
+}
+
+function tryParsePunctuation(tokens, start) {
+  for (const phrase of PUNCT_PHRASES) {
+    let match = true;
+    if (start + phrase.words.length <= tokens.length) {
+      for (let k = 0; k < phrase.words.length; k++) {
+        const w = tokens[start + k].toLowerCase().replace(/[^a-záéíóúçâêôãõ]/g, '');
+        if (w !== phrase.words[k]) {
+          match = false;
+          break;
+        }
+      }
+      if (match) {
+        return { text: phrase.symbol, consumed: phrase.words.length };
+      }
+    }
+  }
+  return null;
+}
+
+function tryParseDecimal(tokens, start) {
+  const leftNum = tryParseNumber(tokens, start);
+  if (!leftNum) return null;
+
+  const commaIndex = start + leftNum.consumed;
+  if (commaIndex < tokens.length) {
+    const commaWord = tokens[commaIndex].toLowerCase().replace(/[^a-záéíóúçâêôãõ]/g, '');
+    if (commaWord === 'vírgula' || commaWord === 'virgula') {
+      let rightIdx = commaIndex + 1;
+      let rightDigits = '';
+      let consumedRight = 0;
+
+      const rightNum = tryParseNumber(tokens, rightIdx);
+      if (rightNum) {
+        rightDigits = String(rightNum.value);
+        consumedRight = rightNum.consumed;
+      } else {
+        while (rightIdx < tokens.length) {
+          const w = tokens[rightIdx].toLowerCase().replace(/[^a-záéíóúçâêôãõ]/g, '');
+          if (UNITS[w] !== undefined) {
+            rightDigits += UNITS[w];
+            rightIdx++;
+            consumedRight++;
+          } else if (!isNaN(parseInt(w, 10))) {
+            rightDigits += parseInt(w, 10);
+            rightIdx++;
+            consumedRight++;
+          } else {
+            break;
+          }
+        }
+      }
+
+      if (consumedRight > 0) {
+        return {
+          text: `${leftNum.value},${rightDigits}`,
+          consumed: leftNum.consumed + 1 + consumedRight
+        };
+      }
+    }
+  }
+  return null;
+}
+
+function tryParsePercent(tokens, start) {
+  let numRes = tryParseDecimal(tokens, start);
+  if (!numRes) {
+    numRes = tryParseNumber(tokens, start);
+  }
+
+  if (numRes) {
+    const nextIdx = start + numRes.consumed;
+    if (nextIdx < tokens.length) {
+      const w1 = tokens[nextIdx].toLowerCase().replace(/[^a-záéíóúçâêôãõ]/g, '');
+      if (w1 === 'porcento' || w1 === 'porcentos') {
+        return { text: `${numRes.text || numRes.value}%`, consumed: numRes.consumed + 1 };
+      }
+      if (w1 === 'por' && nextIdx + 1 < tokens.length) {
+        const w2 = tokens[nextIdx + 1].toLowerCase().replace(/[^a-záéíóúçâêôãõ]/g, '');
+        if (w2 === 'cento' || w2 === 'centos') {
+          return { text: `${numRes.text || numRes.value}%`, consumed: numRes.consumed + 2 };
+        }
+      }
+    }
+  }
+  return null;
+}
+
+function tryParseDate(tokens, start) {
+  const dayNum = tryParseNumber(tokens, start);
+  if (!dayNum) return null;
+
+  const sep1Idx = start + dayNum.consumed;
+  if (sep1Idx < tokens.length) {
+    const sep1 = tokens[sep1Idx].toLowerCase().replace(/[^a-záéíóúçâêôãõ]/g, '');
+    if (sep1 === 'de' || sep1 === 'do' || sep1 === 'da') {
+      let monthVal = null;
+      let consumedMonth = 0;
+
+      const monthWordIdx = sep1Idx + 1;
+      if (monthWordIdx < tokens.length) {
+        const mw = tokens[monthWordIdx].toLowerCase().replace(/[^a-záéíóúçâêôãõ]/g, '');
+        if (MONTHS[mw] !== undefined) {
+          monthVal = MONTHS[mw];
+          consumedMonth = 1;
+        } else {
+          const monthNum = tryParseNumber(tokens, monthWordIdx);
+          if (monthNum) {
+            monthVal = monthNum.value;
+            consumedMonth = monthNum.consumed;
+          }
+        }
+      }
+
+      if (monthVal !== null && monthVal >= 1 && monthVal <= 12) {
+        const sep2Idx = sep1Idx + 1 + consumedMonth;
+        if (sep2Idx < tokens.length) {
+          const sep2 = tokens[sep2Idx].toLowerCase().replace(/[^a-záéíóúçâêôãõ]/g, '');
+          if (sep2 === 'de') {
+            const yearIdx = sep2Idx + 1;
+            const yearNum = tryParseNumber(tokens, yearIdx);
+            if (yearNum) {
+              const dayStr = String(dayNum.value).padStart(2, '0');
+              const monthStr = String(monthVal).padStart(2, '0');
+              const yearStr = String(yearNum.value).padStart(4, '0');
+              return {
+                text: `${dayStr}/${monthStr}/${yearStr}`,
+                consumed: dayNum.consumed + 1 + consumedMonth + 1 + yearNum.consumed
+              };
+            }
+          }
+        }
+      }
+    }
+  }
+  return null;
+}
+
+function processTranscriptText(text) {
+  const rawTokens = text.split(/\s+/);
+  const result = [];
+  let i = 0;
+
+  while (i < rawTokens.length) {
+    const dateRes = tryParseDate(rawTokens, i);
+    if (dateRes) {
+      result.push(dateRes.text);
+      i += dateRes.consumed;
+      continue;
+    }
+
+    const percentRes = tryParsePercent(rawTokens, i);
+    if (percentRes) {
+      result.push(percentRes.text);
+      i += percentRes.consumed;
+      continue;
+    }
+
+    const decimalRes = tryParseDecimal(rawTokens, i);
+    if (decimalRes) {
+      result.push(decimalRes.text);
+      i += decimalRes.consumed;
+      continue;
+    }
+
+    const punctRes = tryParsePunctuation(rawTokens, i);
+    if (punctRes) {
+      result.push(punctRes.text);
+      i += punctRes.consumed;
+      continue;
+    }
+
+    const numberRes = tryParseNumber(rawTokens, i);
+    if (numberRes) {
+      result.push(String(numberRes.value));
+      i += numberRes.consumed;
+      continue;
+    }
+
+    result.push(rawTokens[i]);
+    i++;
+  }
+
+  let joinedText = result.join(' ');
+  // Corrige o espaçamento de pontuações que devem ficar unidas ao caractere anterior
+  joinedText = joinedText.replace(/\s+([.,!?:;)])/g, '$1');
+  joinedText = joinedText.replace(/(\()\s+/g, '$1');
+  return joinedText;
+}
+
+function processFinalSpokenText(rawText, insertPos) {
+  // Processamento unificado para converter números, frações, porcentagens e pontuação falada
+  return {
+    text: processTranscriptText(rawText),
+    consumedTokens: rawText.split(/\s+/).length
+  };
+}
+
+/* ====== Capitalização inteligente (corrigida) ====== */
 function shouldCapitalizeAtPosition(insertPos){
   const text = output.value;
   if(insertPos <= 0) return true;
@@ -369,10 +498,8 @@ function applyCapitalizationRules(finalText, insertPos){
     const text = output.value;
     const prevChar = insertPos > 0 ? text.charAt(insertPos - 1) : '';
     if(/[.!?]/.test(prevChar) || /\r|\n/.test(prevChar) || insertPos === 0){
-      // fim de frase ou início de parágrafo -> maiúscula
       return finalText.charAt(0).toUpperCase() + finalText.slice(1);
     } else if(prevChar){
-      // continuação de frase -> minúscula
       return finalText.charAt(0).toLowerCase() + finalText.slice(1);
     }
     return finalText;
@@ -386,12 +513,25 @@ function insertAtCursor(textToInsert){
   const before = output.value.slice(0, start);
   const after = output.value.slice(end);
 
-  // Se o caractere anterior é pontuação final e não há espaço entre ele e o que será inserido,
-  // e o próximo caractere no documento (na posição de inserção) não é espaço, insere um espaço.
   const prevChar = before.slice(-1);
   const nextChar = output.value.charAt(start) || '';
-  if(/[.!?]/.test(prevChar) && nextChar !== ' ' && textToInsert.charAt(0) !== ' '){
-    textToInsert = ' ' + textToInsert;
+
+  // Gerenciamento inteligente de espaço à esquerda (evita palavras grudadas ou espaços duplos ao retomar fala)
+  if (before.length > 0 && !/\s/.test(prevChar)) {
+    const isPunctuation = /^[.,!?:;)]/.test(textToInsert);
+    const isPrevOpening = /^[([{“‘]/.test(prevChar);
+    if (!isPunctuation && !isPrevOpening && textToInsert.charAt(0) !== ' ') {
+      textToInsert = ' ' + textToInsert;
+    }
+  }
+
+  // Gerenciamento inteligente de espaço à direita se inserido no meio de um texto
+  const lastCharOfInsert = textToInsert.slice(-1);
+  if (after.length > 0 && !/\s/.test(nextChar)) {
+    const nextCharIsPunct = /^[.,!?:;)]/.test(nextChar);
+    if (!nextCharIsPunct && !/\s/.test(lastCharOfInsert)) {
+      textToInsert = textToInsert + ' ';
+    }
   }
 
   const newValue = before + textToInsert + after;
@@ -401,7 +541,7 @@ function insertAtCursor(textToInsert){
   output.focus();
 }
 
-/* ====== SpeechRecognition e overlay ====== */
+/* ====== SpeechRecognition e integração com parser ====== */
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 let recognition = null;
 let recognizing = false;
@@ -439,21 +579,21 @@ if(SpeechRecognition){
     }
 
     if(final && final.trim()){
-      let finalText = final.trim();
+      let finalTextRaw = final.trim();
 
-      if(!autoPunct.checked){
-        finalText = stripPunctuation(finalText);
-      }
-
-      // determine insertion position at the moment final arrives
       const insertPos = (typeof output.selectionStart === 'number') ? output.selectionStart : output.value.length;
 
-      // apply capitalization rules
+      // processa tokens e retorna texto convertido
+      const processed = processFinalSpokenText(finalTextRaw, insertPos);
+      let finalText = processed.text;
+
+      // aplicar capitalização inteligente
       finalText = applyCapitalizationRules(finalText, insertPos);
 
-      // ensure space after punctuation if needed is handled inside insertAtCursor
+      // inserir no cursor (insertAtCursor cuida de espaços de forma inteligente)
       insertAtCursor(finalText);
 
+      // atualizar nota atual / salvar
       if(currentNoteIndex !== null && notes[currentNoteIndex]){
         notes[currentNoteIndex].text = output.value;
         notes[currentNoteIndex].t = Date.now();
@@ -521,38 +661,20 @@ output.addEventListener('input', (e) => {
   scheduleAutoSave();
 });
 
+/* ====== Notas Panel UI Helpers ====== */
+function toggleNotes(){ notesPanel.classList.toggle('open'); const isOpen=notesPanel.classList.contains('open'); notesPanel.setAttribute('aria-hidden', isOpen?'false':'true'); }
+function closeNotes(){ notesPanel.classList.remove('open'); notesPanel.setAttribute('aria-hidden', 'true'); }
+
 /* ====== Atalhos de teclado ====== */
 window.addEventListener('keydown', (e) => {
-  // F9 -> nova nota (evita conflito com navegadores)
-  if(e.key === 'F9'){
-    e.preventDefault();
-    newNote();
-    return;
-  }
-
-  // Esc -> toggle mic
+  if(e.key === 'F9'){ e.preventDefault(); newNote(); return; }
   if(e.key === 'Escape'){ e.preventDefault(); toggleMic(); return; }
-  // F4 -> copiar
   if(e.key === 'F4'){ e.preventDefault(); copyAll(); return; }
-  // Ctrl+U -> desfazer (custom)
   if(e.ctrlKey && (e.key === 'u' || e.key === 'U')){ e.preventDefault(); undo(); return; }
-  // Ctrl+Y or Ctrl+Shift+Z -> refazer
-  if((e.ctrlKey && (e.key === 'y' || e.key === 'Y')) || (e.ctrlKey && e.shiftKey && (e.key === 'Z'))){
-    e.preventDefault();
-    redo();
-    return;
-  }
-  // Interceptar Ctrl+N para evitar abrir nova janela do navegador; redireciona para nova nota
-  if(e.ctrlKey && (e.key === 'n' || e.key === 'N')){
-    e.preventDefault();
-    newNote();
-    return;
-  }
-  // Ctrl+L -> limpar editor
+  if((e.ctrlKey && (e.key === 'y' || e.key === 'Y')) || (e.ctrlKey && e.shiftKey && (e.key === 'Z'))){ e.preventDefault(); redo(); return; }
+  if(e.ctrlKey && (e.key === 'n' || e.key === 'N')){ e.preventDefault(); newNote(); return; }
   if(e.ctrlKey && (e.key === 'l' || e.key === 'L')){ e.preventDefault(); clearEditor(); return; }
-  // Ctrl+M -> abrir/fechar painel de notas
   if(e.ctrlKey && (e.key === 'm' || e.key === 'M')){ e.preventDefault(); toggleNotes(); return; }
-  // Ctrl+Shift+Delete -> excluir todas as notas
   if(e.ctrlKey && e.shiftKey && e.key === 'Delete'){ e.preventDefault(); deleteAllNotes(); return; }
 });
 
@@ -561,12 +683,12 @@ loadNotes();
 pushHistory(output.value || '');
 setFontSize(Number(fontRange.value || 22));
 
-/* ====== PWA: registrar service worker (se disponível) ====== */
+/* ====== Registrar service worker ====== */
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('service-worker.js').then(()=> { console.log('Service worker registrado.'); }).catch(err => { console.warn('Falha ao registrar service worker:', err); });
+  navigator.serviceWorker.register('/service-worker.js').then(()=> { console.log('Service worker registrado.'); }).catch(err => { console.warn('Falha ao registrar service worker:', err); });
 }
 
-/* ====== Expor para debug ====== */
+/* ====== Debug export ====== */
 window.__ditado = { saveCurrentAsNote, notes, loadNotes, deleteAllNotes, undo, redo };
 </script>
 </body>
