@@ -4,7 +4,17 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>Bloco de Notas com Ditado (PWA)</title>
+
+<!-- PWA manifest -->
 <link rel="manifest" href="manifest.json">
+
+<!-- Favicon / icons -->
+<link rel="icon" type="image/svg+xml" href="icons/icon.svg">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="theme-color" content="#0b5cff">
+
 <style>
   :root{--controls-height:60px;--notes-panel-width:360px;--font-size:22px;}
   html,body{height:100%;margin:0;font-family:Arial, Helvetica, sans-serif;background:#f6f7f9;color:#111;overflow:hidden;}
@@ -145,8 +155,10 @@ let notes = [];
 const STORAGE_KEY = 'ditado_notes_v2';
 const HISTORY_LIMIT = 300;
 
-/* ====== Estado de interim ====== */
-let lastInterim = ''; // texto interim atual vindo do recognition
+/* ====== Estado de interim e nota atual ====== */
+let lastInterim = '';
+let currentNoteIndex = null;
+const MAX_NOTES = 500;
 
 /* ====== Utilitários ====== */
 function nowLabel(ts){ return new Date(ts).toLocaleString(); }
@@ -170,25 +182,72 @@ function renderNotes(){
     el.appendChild(meta);
 
     loadBtn.addEventListener('click', ()=> { loadNote(idx); closeNotes(); });
-    delBtn.addEventListener('click', ()=> { if(confirm('Excluir esta nota?')) { notes.splice(idx,1); persistNotes(); renderNotes(); status.textContent='Nota excluída'; setTimeout(()=>status.textContent='Pronto',900); } });
+    delBtn.addEventListener('click', ()=> {
+      if(!confirm('Excluir esta nota?')) return;
+      if(currentNoteIndex !== null){
+        if(idx === currentNoteIndex){
+          currentNoteIndex = null;
+        } else if(idx < currentNoteIndex){
+          currentNoteIndex = currentNoteIndex - 1;
+        }
+      }
+      notes.splice(idx,1);
+      persistNotes();
+      renderNotes();
+      status.textContent='Nota excluída';
+      setTimeout(()=>status.textContent='Pronto',900);
+    });
 
     notesList.appendChild(el);
   });
 }
 
-/* ====== Autosave ====== */
+/* ====== Salvamento automático (atualiza nota existente) ====== */
 function scheduleAutoSave(){ clearTimeout(saveTimer); saveTimer = setTimeout(()=> { saveCurrentAsNote(); }, autosaveDelay); }
-function saveCurrentAsNote(){ const text = output.value.trim(); if(!text) return; const note = { text, t: Date.now() }; notes.unshift(note); persistNotes(); renderNotes(); status.textContent = 'Salvo'; setTimeout(()=> status.textContent = 'Pronto', 1000); }
 
-/* ====== History / Undo ====== */
+function saveCurrentAsNote(){
+  const text = output.value.trim();
+  if(!text) return;
+
+  if(currentNoteIndex !== null && notes[currentNoteIndex]){
+    if(notes[currentNoteIndex].text === text) return;
+    notes[currentNoteIndex].text = text;
+    notes[currentNoteIndex].t = Date.now();
+    persistNotes();
+    renderNotes();
+    status.textContent = 'Salvo';
+    setTimeout(()=> status.textContent = 'Pronto', 900);
+    return;
+  }
+
+  if(notes.length > 0 && notes[0].text === text){
+    notes[0].t = Date.now();
+    persistNotes();
+    renderNotes();
+    currentNoteIndex = 0;
+    status.textContent = 'Salvo';
+    setTimeout(()=> status.textContent = 'Pronto', 900);
+    return;
+  }
+
+  notes.unshift({ text, t: Date.now() });
+  if(notes.length > MAX_NOTES) notes.length = MAX_NOTES;
+  persistNotes();
+  renderNotes();
+  currentNoteIndex = 0;
+  status.textContent = 'Salvo';
+  setTimeout(()=> status.textContent = 'Pronto', 900);
+}
+
+/* ====== Histórico / Desfazer ====== */
 function pushHistory(value){ if(history.length && history[history.length-1] === value) return; history.push(value); if(history.length > HISTORY_LIMIT) history.shift(); }
 function undo(){ if(history.length <= 1) return; history.pop(); const prev = history[history.length-1] || ''; output.value = prev; output.focus(); scheduleAutoSave(); status.textContent = 'Desfeito'; setTimeout(()=> status.textContent = 'Pronto',700); }
 
-/* ====== Notes actions ====== */
-function newNote(){ saveCurrentAsNote(); output.value = ''; history = ['']; status.textContent = 'Nova nota'; setTimeout(()=> status.textContent = 'Pronto',700); }
-function clearEditor(){ output.value = ''; pushHistory(output.value); status.textContent = 'Limpo'; setTimeout(()=> status.textContent = 'Pronto',700); }
-function loadNote(idx){ const n = notes[idx]; if(!n) return; output.value = n.text; history = [n.text]; status.textContent = 'Nota carregada'; setTimeout(()=> status.textContent = 'Pronto',700); }
-function deleteAllNotes(){ if(!notes.length) return; if(!confirm('Excluir todas as notas salvas?')) return; notes = []; persistNotes(); renderNotes(); status.textContent = 'Todas as notas excluídas'; setTimeout(()=> status.textContent = 'Pronto',900); }
+/* ====== Notas: nova, carregar, limpar, excluir todas ====== */
+function newNote(){ saveCurrentAsNote(); output.value = ''; history = ['']; currentNoteIndex = null; status.textContent = 'Nova nota'; setTimeout(()=> status.textContent = 'Pronto',700); }
+function clearEditor(){ output.value = ''; pushHistory(output.value); currentNoteIndex = null; status.textContent = 'Limpo'; setTimeout(()=> status.textContent = 'Pronto',700); }
+function loadNote(idx){ const n = notes[idx]; if(!n) return; output.value = n.text; history = [n.text]; currentNoteIndex = idx; status.textContent = 'Nota carregada'; setTimeout(()=> status.textContent = 'Pronto',700); }
+function deleteAllNotes(){ if(!notes.length) return; if(!confirm('Excluir todas as notas salvas?')) return; notes = []; persistNotes(); renderNotes(); currentNoteIndex = null; status.textContent = 'Todas as notas excluídas'; setTimeout(()=> status.textContent = 'Pronto',900); }
 
 /* ====== Copy (texto puro) e toast ====== */
 let __toastTimer = null;
@@ -216,10 +275,8 @@ async function copyAll(){
     if(navigator.clipboard && navigator.clipboard.writeText){
       await navigator.clipboard.writeText(textToCopy);
     } else {
-      // fallback: selecionar e copiar do textarea (texto puro)
       output.select();
       document.execCommand('copy');
-      // remover seleção
       try { window.getSelection().removeAllRanges(); } catch(e){}
     }
 
@@ -289,7 +346,6 @@ if(SpeechRecognition){
       else interim += t;
     }
 
-    // mostrar interim na overlay (rolável)
     if(interim && interim.trim()){
       lastInterim = interim.trim();
       showOverlay(lastInterim, true);
@@ -302,13 +358,11 @@ if(SpeechRecognition){
     if(final && final.trim()){
       let finalText = final.trim();
 
-      // aplicar opção de pontuação automática
       if(!autoPunct.checked){
         finalText = stripPunctuation(finalText);
         finalText = decapitalizeIfNeeded(finalText);
       }
 
-      // Substituir interim no fim do editor se presente, evitar duplicação
       if(lastInterim && output.value.endsWith(lastInterim)){
         output.value = output.value.slice(0, -lastInterim.length).trimEnd();
         if(output.value) output.value += ' ';
@@ -317,10 +371,18 @@ if(SpeechRecognition){
         output.value += (output.value && !output.value.endsWith(' ') ? ' ' : '') + finalText;
       }
 
+      if(currentNoteIndex !== null && notes[currentNoteIndex]){
+        notes[currentNoteIndex].text = output.value;
+        notes[currentNoteIndex].t = Date.now();
+        persistNotes();
+        renderNotes();
+      } else {
+        saveCurrentAsNote();
+      }
+
       pushHistory(output.value);
       scheduleAutoSave();
 
-      // limpar estado interim e overlay
       lastInterim = '';
       hideOverlay();
     }
@@ -370,23 +432,19 @@ notesToggle.addEventListener('click', toggleNotes);
 closeNotesBtn.addEventListener('click', closeNotes);
 deleteAllBtn.addEventListener('click', deleteAllNotes);
 
-output.addEventListener('input', (e) => { pushHistory(output.value); scheduleAutoSave(); });
+output.addEventListener('input', (e) => {
+  pushHistory(output.value);
+  scheduleAutoSave();
+});
 
 /* ====== Atalhos de teclado ====== */
 window.addEventListener('keydown', (e) => {
-  // Esc -> toggle mic
   if(e.key === 'Escape'){ e.preventDefault(); toggleMic(); return; }
-  // F4 -> copiar
   if(e.key === 'F4'){ e.preventDefault(); copyAll(); return; }
-  // Ctrl+U -> desfazer (custom)
   if(e.ctrlKey && (e.key === 'u' || e.key === 'U')){ e.preventDefault(); undo(); return; }
-  // Ctrl+N -> nova nota
   if(e.ctrlKey && (e.key === 'n' || e.key === 'N')){ e.preventDefault(); newNote(); return; }
-  // Ctrl+L -> limpar editor
   if(e.ctrlKey && (e.key === 'l' || e.key === 'L')){ e.preventDefault(); clearEditor(); return; }
-  // Ctrl+M -> abrir/fechar painel de notas
   if(e.ctrlKey && (e.key === 'm' || e.key === 'M')){ e.preventDefault(); toggleNotes(); return; }
-  // Ctrl+Shift+Delete -> excluir todas as notas
   if(e.ctrlKey && e.shiftKey && e.key === 'Delete'){ e.preventDefault(); deleteAllNotes(); return; }
 });
 
