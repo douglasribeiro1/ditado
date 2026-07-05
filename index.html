@@ -87,6 +87,12 @@
         <input type="checkbox" id="autoPunct" checked />
         <span>Pontuação automática</span>
       </label>
+
+      <label class="toggle" title="Caixa alta para ditado">
+        <input type="checkbox" id="allCaps" />
+        <span>Caixa alta</span>
+      </label>
+
       <button id="notesToggle" title="Ctrl+M">📚 Notas (Ctrl+M)</button>
       <div id="status" aria-live="polite">Pronto</div>
     </div>
@@ -139,6 +145,7 @@ const fontRange = document.getElementById('fontRange');
 const fontInc = document.getElementById('fontInc');
 const fontDec = document.getElementById('fontDec');
 const autoPunct = document.getElementById('autoPunct');
+const allCaps = document.getElementById('allCaps');
 
 const overlay = document.getElementById('dictateOverlay');
 const overlayText = document.getElementById('overlayText');
@@ -364,18 +371,56 @@ function toggleNotes(){ if(notesPanel.classList.contains('open')) closeNotes(); 
 /* ====== Helpers de pontuação ====== */
 function stripPunctuation(s){ return s.replace(/[.,!?;:—–\-()\"'«»“”…]/g, '').replace(/\s+/g,' ').trim(); }
 
-/* ====== Decapitalização contextual ====== */
-function decapitalizeIfNeeded(text){
-  if(!text) return text;
-  const prev = output.value.trim();
-  const sentenceEnd = /[.!?]\s*$/.test(prev);
-  if(!autoPunct.checked && !sentenceEnd && prev.length > 0){
-    return text.charAt(0).toLowerCase() + text.slice(1);
+/* ====== Capitalização inteligente ====== */
+function shouldCapitalizeAtPosition(insertPos){
+  // verifica o caractere anterior ao ponto de inserção
+  const text = output.value;
+  if(insertPos <= 0) return true; // começo do documento -> capitaliza
+  const prevChar = text.charAt(insertPos - 1);
+  if(/\r|\n/.test(prevChar)) return true; // início de parágrafo
+  if(/[.!?]/.test(prevChar)) return true; // fim de frase
+  return false;
+}
+
+function applyCapitalizationRules(finalText, insertPos){
+  if(!finalText) return finalText;
+  // se Caixa Alta ativada, tudo em maiúsculas
+  if(allCaps.checked) return finalText.toUpperCase();
+
+  // se pontuação automática desligada: capitaliza no início de frase/parágrafo
+  if(!autoPunct.checked){
+    const cap = shouldCapitalizeAtPosition(insertPos);
+    if(cap){
+      return finalText.charAt(0).toUpperCase() + finalText.slice(1);
+    } else {
+      return finalText.charAt(0).toLowerCase() + finalText.slice(1);
+    }
+  } else {
+    // pontuação automática ligada:
+    // se o caractere anterior não é fim de frase nem quebra de linha, manter minúscula (continuação)
+    const text = output.value;
+    const prevChar = insertPos > 0 ? text.charAt(insertPos - 1) : '';
+    if(prevChar && !/[.!?\r\n]/.test(prevChar)){
+      return finalText.charAt(0).toLowerCase() + finalText.slice(1);
+    }
+    // caso contrário, manter como veio (presumir que o recognizer já colocou maiúscula se for início)
+    return finalText;
   }
-  if(!autoPunct.checked && !prev){
-    return text.charAt(0).toLowerCase() + text.slice(1);
-  }
-  return text;
+}
+
+/* ====== Inserção no cursor ====== */
+function insertAtCursor(textToInsert){
+  // insere texto no ponto atual do cursor, substitui seleção se houver
+  const start = output.selectionStart;
+  const end = output.selectionEnd;
+  const before = output.value.slice(0, start);
+  const after = output.value.slice(end);
+  const newValue = before + textToInsert + after;
+  output.value = newValue;
+  // posiciona cursor logo após o texto inserido
+  const newPos = before.length + textToInsert.length;
+  output.setSelectionRange(newPos, newPos);
+  output.focus();
 }
 
 /* ====== SpeechRecognition e overlay ====== */
@@ -406,6 +451,7 @@ if(SpeechRecognition){
       else interim += t;
     }
 
+    // mostrar interim na overlay (apenas visual)
     if(interim && interim.trim()){
       lastInterim = interim.trim();
       showOverlay(lastInterim, true);
@@ -418,19 +464,23 @@ if(SpeechRecognition){
     if(final && final.trim()){
       let finalText = final.trim();
 
+      // aplicar opção de pontuação automática (se desligada, remover pontuação)
       if(!autoPunct.checked){
         finalText = stripPunctuation(finalText);
-        finalText = decapitalizeIfNeeded(finalText);
       }
 
-      if(lastInterim && output.value.endsWith(lastInterim)){
-        output.value = output.value.slice(0, -lastInterim.length).trimEnd();
-        if(output.value) output.value += ' ';
-        output.value += finalText;
-      } else if(!output.value.endsWith(finalText)){
-        output.value += (output.value && !output.value.endsWith(' ') ? ' ' : '') + finalText;
-      }
+      // determinar posição de inserção atual (cursor)
+      // usamos a posição atual do cursor no momento do recebimento do final
+      const insertPos = output.selectionStart || output.value.length;
 
+      // aplicar regras de capitalização e caixa alta
+      finalText = applyCapitalizationRules(finalText, insertPos);
+
+      // se allCaps ativado, já transformado; caso contrário, manter finalText
+      // inserir no cursor (substitui seleção)
+      insertAtCursor(finalText);
+
+      // atualizar nota atual / salvar
       if(currentNoteIndex !== null && notes[currentNoteIndex]){
         notes[currentNoteIndex].text = output.value;
         notes[currentNoteIndex].t = Date.now();
@@ -443,6 +493,7 @@ if(SpeechRecognition){
       pushHistory(output.value);
       scheduleAutoSave();
 
+      // limpar estado interim e overlay
       lastInterim = '';
       hideOverlay();
     }
