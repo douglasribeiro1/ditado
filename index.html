@@ -5,14 +5,12 @@
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>Bloco de Notas com Ditado (PWA)</title>
 
-<!-- PWA manifest -->
+<!-- Manifest PWA (aponta para manifest.json local) -->
 <link rel="manifest" href="manifest.json">
 
-<!-- Favicon / icons -->
-<link rel="icon" type="image/svg+xml" href="icons/icon.svg">
-<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
-<link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
-<link rel="apple-touch-icon" href="icons/icon-192.png">
+<!-- Favicon embutido (data URI) — não precisa de arquivo local -->
+<link rel="icon" type="image/svg+xml" href='data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect rx="64" width="512" height="512" fill="%230b5cff"/><g transform="translate(64,64)" fill="%23fff"><rect x="0" y="0" width="384" height="48" rx="8"/><rect x="0" y="72" width="384" height="240" rx="12"/><rect x="0" y="336" width="384" height="48" rx="8"/><circle cx="320" cy="264" r="28" fill="%230b5cff"/></g></svg>'>
+
 <meta name="theme-color" content="#0b5cff">
 
 <style>
@@ -73,6 +71,7 @@
       <button id="micBtn" class="primary" title="Esc para alternar">🎤 Iniciar (Esc)</button>
       <button id="copyBtn" title="F4 para copiar">📋 Copiar (F4)</button>
       <button id="undoBtn" title="Ctrl+U">↩️ Desfazer (Ctrl+U)</button>
+      <button id="redoBtn" title="Ctrl+Y">↪️ Refazer (Ctrl+Y)</button>
       <button id="newBtn" title="Ctrl+N">📝 Nova Nota (Ctrl+N)</button>
       <button id="clearBtn" class="warn" title="Ctrl+L">🧹 Limpar (Ctrl+L)</button>
 
@@ -128,6 +127,7 @@ const output = document.getElementById('output');
 const micBtn = document.getElementById('micBtn');
 const copyBtn = document.getElementById('copyBtn');
 const undoBtn = document.getElementById('undoBtn');
+const redoBtn = document.getElementById('redoBtn');
 const newBtn = document.getElementById('newBtn');
 const clearBtn = document.getElementById('clearBtn');
 const notesToggle = document.getElementById('notesToggle');
@@ -151,6 +151,7 @@ const toastEl = document.getElementById('toast');
 let saveTimer = null;
 const autosaveDelay = 2000;
 let history = [];
+let redoStack = [];
 let notes = [];
 const STORAGE_KEY = 'ditado_notes_v2';
 const HISTORY_LIMIT = 300;
@@ -239,15 +240,76 @@ function saveCurrentAsNote(){
   setTimeout(()=> status.textContent = 'Pronto', 900);
 }
 
-/* ====== Histórico / Desfazer ====== */
-function pushHistory(value){ if(history.length && history[history.length-1] === value) return; history.push(value); if(history.length > HISTORY_LIMIT) history.shift(); }
-function undo(){ if(history.length <= 1) return; history.pop(); const prev = history[history.length-1] || ''; output.value = prev; output.focus(); scheduleAutoSave(); status.textContent = 'Desfeito'; setTimeout(()=> status.textContent = 'Pronto',700); }
+/* ====== Histórico / Desfazer / Refazer ====== */
+function pushHistory(value){
+  if(history.length && history[history.length-1] === value) return;
+  history.push(value);
+  if(history.length > HISTORY_LIMIT) history.shift();
+  // ao empurrar novo estado, limpar redo
+  redoStack = [];
+}
+function undo(){
+  if(history.length <= 1) return;
+  const cur = history.pop();
+  redoStack.push(cur);
+  const prev = history[history.length-1] || '';
+  output.value = prev;
+  output.focus();
+  scheduleAutoSave();
+  status.textContent = 'Desfeito';
+  setTimeout(()=> status.textContent = 'Pronto',700);
+}
+function redo(){
+  if(redoStack.length === 0) return;
+  const next = redoStack.pop();
+  output.value = next;
+  pushHistory(next);
+  output.focus();
+  scheduleAutoSave();
+  status.textContent = 'Refeito';
+  setTimeout(()=> status.textContent = 'Pronto',700);
+}
 
 /* ====== Notas: nova, carregar, limpar, excluir todas ====== */
-function newNote(){ saveCurrentAsNote(); output.value = ''; history = ['']; currentNoteIndex = null; status.textContent = 'Nova nota'; setTimeout(()=> status.textContent = 'Pronto',700); }
-function clearEditor(){ output.value = ''; pushHistory(output.value); currentNoteIndex = null; status.textContent = 'Limpo'; setTimeout(()=> status.textContent = 'Pronto',700); }
-function loadNote(idx){ const n = notes[idx]; if(!n) return; output.value = n.text; history = [n.text]; currentNoteIndex = idx; status.textContent = 'Nota carregada'; setTimeout(()=> status.textContent = 'Pronto',700); }
-function deleteAllNotes(){ if(!notes.length) return; if(!confirm('Excluir todas as notas salvas?')) return; notes = []; persistNotes(); renderNotes(); currentNoteIndex = null; status.textContent = 'Todas as notas excluídas'; setTimeout(()=> status.textContent = 'Pronto',900); }
+function newNote(){
+  saveCurrentAsNote();
+  output.value = '';
+  history = [''];
+  redoStack = [];
+  currentNoteIndex = null;
+  status.textContent = 'Nova nota';
+  setTimeout(()=> status.textContent = 'Pronto',700);
+}
+
+function clearEditor(){
+  output.value = '';
+  pushHistory(output.value);
+  currentNoteIndex = null;
+  status.textContent = 'Limpo';
+  setTimeout(()=> status.textContent = 'Pronto',700);
+}
+
+function loadNote(idx){
+  const n = notes[idx];
+  if(!n) return;
+  output.value = n.text;
+  history = [n.text];
+  redoStack = [];
+  currentNoteIndex = idx;
+  status.textContent = 'Nota carregada';
+  setTimeout(()=> status.textContent = 'Pronto',700);
+}
+
+function deleteAllNotes(){
+  if(!notes.length) return;
+  if(!confirm('Excluir todas as notas salvas?')) return;
+  notes = [];
+  persistNotes();
+  renderNotes();
+  currentNoteIndex = null;
+  status.textContent = 'Todas as notas excluídas';
+  setTimeout(()=> status.textContent = 'Pronto',900);
+}
 
 /* ====== Copy (texto puro) e toast ====== */
 let __toastTimer = null;
@@ -426,6 +488,7 @@ function hideOverlay(){ overlay.classList.remove('open'); overlay.setAttribute('
 micBtn.addEventListener('click', toggleMic);
 copyBtn.addEventListener('click', copyAll);
 undoBtn.addEventListener('click', undo);
+redoBtn.addEventListener('click', redo);
 newBtn.addEventListener('click', newNote);
 clearBtn.addEventListener('click', clearEditor);
 notesToggle.addEventListener('click', toggleNotes);
@@ -439,12 +502,31 @@ output.addEventListener('input', (e) => {
 
 /* ====== Atalhos de teclado ====== */
 window.addEventListener('keydown', (e) => {
+  // Bloquear comportamento padrão do navegador para Ctrl+N (nova janela) e garantir nova nota
+  if(e.ctrlKey && (e.key === 'n' || e.key === 'N')){
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    newNote();
+    return;
+  }
+
+  // Esc -> toggle mic
   if(e.key === 'Escape'){ e.preventDefault(); toggleMic(); return; }
+  // F4 -> copiar
   if(e.key === 'F4'){ e.preventDefault(); copyAll(); return; }
+  // Ctrl+U -> desfazer (custom)
   if(e.ctrlKey && (e.key === 'u' || e.key === 'U')){ e.preventDefault(); undo(); return; }
-  if(e.ctrlKey && (e.key === 'n' || e.key === 'N')){ e.preventDefault(); newNote(); return; }
+  // Ctrl+Y or Ctrl+Shift+Z -> refazer
+  if((e.ctrlKey && (e.key === 'y' || e.key === 'Y')) || (e.ctrlKey && e.shiftKey && (e.key === 'Z'))){
+    e.preventDefault();
+    redo();
+    return;
+  }
+  // Ctrl+L -> limpar editor
   if(e.ctrlKey && (e.key === 'l' || e.key === 'L')){ e.preventDefault(); clearEditor(); return; }
+  // Ctrl+M -> abrir/fechar painel de notas
   if(e.ctrlKey && (e.key === 'm' || e.key === 'M')){ e.preventDefault(); toggleNotes(); return; }
+  // Ctrl+Shift+Delete -> excluir todas as notas
   if(e.ctrlKey && e.shiftKey && e.key === 'Delete'){ e.preventDefault(); deleteAllNotes(); return; }
 });
 
@@ -459,7 +541,7 @@ if('serviceWorker' in navigator){
 }
 
 /* ====== Expor para debug ====== */
-window.__ditado = { saveCurrentAsNote, notes, loadNotes, deleteAllNotes };
+window.__ditado = { saveCurrentAsNote, notes, loadNotes, deleteAllNotes, undo, redo };
 </script>
 </body>
 </html>
