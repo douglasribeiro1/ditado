@@ -555,11 +555,29 @@ const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecogni
 let recognition = null;
 let recognizing = false;
 
+// Função auxiliar para aplicar as propriedades de pontuação corretas no motor de reconhecimento
+function applyEnginePunctuationConfig() {
+  if (!recognition) return;
+  
+  // Propriedade oficial padrão para controle de pontuação automática implícita (Chrome 151+ e Edge modernos)
+  if ('unspokenPunctuation' in recognition) {
+    recognition.unspokenPunctuation = autoPunct.checked;
+  }
+  
+  // Atributo legado/experimental adotado por algumas implementações de browsers
+  try {
+    recognition.punctuation = autoPunct.checked ? 'auto' : 'none';
+  } catch(e) {}
+}
+
 if(SpeechRecognition){
   recognition = new SpeechRecognition();
   recognition.lang = 'pt-BR';
   recognition.interimResults = true;
   recognition.continuous = true;
+
+  // Aplica a configuração inicial
+  applyEnginePunctuationConfig();
 
   recognition.onstart = () => {
     recognizing = true;
@@ -567,6 +585,9 @@ if(SpeechRecognition){
     status.textContent = 'Gravando...';
     showOverlay('', true);
     lastInterim = '';
+
+    // Garante que o motor de reconhecimento utilize o estado atualizado do checkbox ao começar
+    applyEnginePunctuationConfig();
   };
 
   recognition.onresult = (e) => {
@@ -595,6 +616,13 @@ if(SpeechRecognition){
       // processa tokens e retorna texto convertido
       const processed = processFinalSpokenText(finalTextRaw, insertPos);
       let finalText = processed.text;
+
+      // Fallback para navegadores (como versões antigas do Chrome) que não realizam
+      // pontuação automática nativa: se a pontuação automática estiver ativada e o texto
+      // processado não contiver nenhuma pontuação final, adiciona um ponto final (.) ao término do trecho.
+      if (autoPunct.checked && !/[.!?,,;:]$/.test(finalText)) {
+        finalText = finalText + '.';
+      }
 
       // aplicar capitalização inteligente
       finalText = applyCapitalizationRules(finalText, insertPos);
@@ -642,6 +670,9 @@ if(SpeechRecognition){
 }
 
 function toggleMic(){ if(!recognition) return; if(!recognizing){ try{ recognition.start(); }catch(e){ console.warn(e); } } else { recognition.stop(); } }
+
+// Escuta alterações do checkbox para mudar a propriedade do motor de reconhecimento em tempo real se ativo
+autoPunct.addEventListener('change', applyEnginePunctuationConfig);
 
 /* ====== Overlay helpers ====== */
 function showOverlay(text, showSpinner){
