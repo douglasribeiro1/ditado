@@ -64,6 +64,13 @@
   @keyframes spin{to{transform:rotate(360deg);}} .toggle {display:inline-flex;align-items:center;gap:6px;padding:6px 8px;border-radius:6px;border:1px solid #ddd;background:#fff;} .toggle input{transform:scale(1.1);}
   #toast {position: fixed;left: 50%;top: 50%;transform: translate(-50%, -50%) scale(0.98);background: rgba(0,0,0,0.85);color: #fff;padding: 12px 18px;border-radius: 10px;font-size: 16px;z-index: 999999;opacity: 0;pointer-events: none;transition: opacity 160ms ease, transform 160ms ease;box-shadow: 0 6px 18px rgba(0,0,0,0.35);font-family: Arial, Helvetica, sans-serif;display: none;}
   #toast.show {opacity: 1;transform: translate(-50%, -50%) scale(1);pointer-events: auto;}
+    #controls::-webkit-scrollbar {
+    display: none; /* Oculta a barra de rolagem no Chrome/Safari */
+  }
+  #controls {
+    -ms-overflow-style: none;  /* Oculta no IE/Edge */
+    scrollbar-width: none;  /* Oculta no Firefox */
+  }
 </style>
 </head>
 <body>
