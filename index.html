@@ -29,38 +29,14 @@
   .note .meta{display:block;color:#666;margin-top:8px;font-size:12px;} .note .actions{position:absolute;top:8px;right:8px;display:flex;gap:6px;} .small{font-size:13px;color:#666;}
   #status{font-size:13px;color:#666;margin-left:12px;} @media (max-width:800px){ #notesPanel.open{width:100%;position:absolute;left:0;top:var(--controls-height);height:calc(100vh - var(--controls-height));z-index:2147483647;} }
 
-  /* Overlay de ditado (barra inferior) - menor e rolável */
   #dictateOverlay{position:fixed;left:12px;right:12px;bottom:12px;height:56px;display:flex;align-items:center;justify-content:center;padding:8px 12px;box-sizing:border-box;background:linear-gradient(180deg, rgba(0,0,0,0.35), rgba(0,0,0,0.55));color:#fff;z-index:2147483650;transform:translateY(110%);transition:transform .14s ease, opacity .14s ease;opacity:0;pointer-events:none;font-family: Arial, Helvetica, sans-serif;border-radius:10px;}
   #dictateOverlay.open{transform:translateY(0%); opacity:1; pointer-events:auto;}
   #dictateOverlay .text{font-size:16px;line-height:1.2;max-width:calc(100% - 120px);text-align:left;word-break:break-word;overflow:auto;white-space:nowrap;}
-  #dictateOverlay .text::-webkit-scrollbar{height:6px;} #dictateOverlay .hint{position:absolute;left:14px;bottom:6px;font-size:12px;color:rgba(255,255,255,0.85);}
-  #dictateOverlay .spinner{position:absolute;right:14px;bottom:6px;width:12px;height:12px;border-radius:50%;border:2px solid rgba(255,255,255,0.25);border-top-color: #fff;animation:spin 1s linear infinite;opacity:0.95;}
+  #dictateOverlay .hint{position:absolute;left:14px;bottom:6px;font-size:12px;color:rgba(255,255,255,0.85);}
+  #dictateOverlay .spinner{position:absolute;right:14px;bottom:6px;width:12px;height:12px;border-radius:50%;border:2px solid rgba(255,255,255,0.25);border-top-color: #fff;animation:spin 1s linear infinite;}
   @keyframes spin{to{transform:rotate(360deg);}} .toggle {display:inline-flex;align-items:center;gap:6px;padding:6px 8px;border-radius:6px;border:1px solid #ddd;background:#fff;} .toggle input{transform:scale(1.1);}
-
-  /* Toast central para confirmação de cópia */
-  #toast {
-    position: fixed;
-    left: 50%;
-    top: 50%;
-    transform: translate(-50%, -50%) scale(0.98);
-    background: rgba(0,0,0,0.85);
-    color: #fff;
-    padding: 12px 18px;
-    border-radius: 10px;
-    font-size: 16px;
-    z-index: 999999;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 160ms ease, transform 160ms ease;
-    box-shadow: 0 6px 18px rgba(0,0,0,0.35);
-    font-family: Arial, Helvetica, sans-serif;
-    display: none;
-  }
-  #toast.show {
-    opacity: 1;
-    transform: translate(-50%, -50%) scale(1);
-    pointer-events: auto;
-  }
+  #toast {position: fixed;left: 50%;top: 50%;transform: translate(-50%, -50%) scale(0.98);background: rgba(0,0,0,0.85);color: #fff;padding: 12px 18px;border-radius: 10px;font-size: 16px;z-index: 999999;opacity: 0;pointer-events: none;transition: opacity 160ms ease, transform 160ms ease;box-shadow: 0 6px 18px rgba(0,0,0,0.35);font-family: Arial, Helvetica, sans-serif;display: none;}
+  #toast.show {opacity: 1;transform: translate(-50%, -50%) scale(1);pointer-events: auto;}
 </style>
 </head>
 <body>
@@ -373,51 +349,44 @@ function stripPunctuation(s){ return s.replace(/[.,!?;:—–\-()\"'«»“”�
 
 /* ====== Capitalização inteligente ====== */
 function shouldCapitalizeAtPosition(insertPos){
-  // verifica o caractere anterior ao ponto de inserção
   const text = output.value;
-  if(insertPos <= 0) return true; // começo do documento -> capitaliza
+  if(insertPos <= 0) return true;
   const prevChar = text.charAt(insertPos - 1);
-  if(/\r|\n/.test(prevChar)) return true; // início de parágrafo
-  if(/[.!?]/.test(prevChar)) return true; // fim de frase
+  if(/\r|\n/.test(prevChar)) return true;
+  if(/[.!?]/.test(prevChar)) return true;
   return false;
 }
 
 function applyCapitalizationRules(finalText, insertPos){
   if(!finalText) return finalText;
-  // se Caixa Alta ativada, tudo em maiúsculas
   if(allCaps.checked) return finalText.toUpperCase();
 
-  // se pontuação automática desligada: capitaliza no início de frase/parágrafo
   if(!autoPunct.checked){
     const cap = shouldCapitalizeAtPosition(insertPos);
-    if(cap){
-      return finalText.charAt(0).toUpperCase() + finalText.slice(1);
-    } else {
-      return finalText.charAt(0).toLowerCase() + finalText.slice(1);
-    }
+    if(cap) return finalText.charAt(0).toUpperCase() + finalText.slice(1);
+    return finalText.charAt(0).toLowerCase() + finalText.slice(1);
   } else {
-    // pontuação automática ligada:
-    // se o caractere anterior não é fim de frase nem quebra de linha, manter minúscula (continuação)
     const text = output.value;
     const prevChar = insertPos > 0 ? text.charAt(insertPos - 1) : '';
-    if(prevChar && !/[.!?\r\n]/.test(prevChar)){
+    if(/[.!?]/.test(prevChar) || /\r|\n/.test(prevChar) || insertPos === 0){
+      // fim de frase ou início de parágrafo -> maiúscula
+      return finalText.charAt(0).toUpperCase() + finalText.slice(1);
+    } else if(prevChar){
+      // continuação de frase -> minúscula
       return finalText.charAt(0).toLowerCase() + finalText.slice(1);
     }
-    // caso contrário, manter como veio (presumir que o recognizer já colocou maiúscula se for início)
     return finalText;
   }
 }
 
 /* ====== Inserção no cursor ====== */
 function insertAtCursor(textToInsert){
-  // insere texto no ponto atual do cursor, substitui seleção se houver
   const start = output.selectionStart;
   const end = output.selectionEnd;
   const before = output.value.slice(0, start);
   const after = output.value.slice(end);
   const newValue = before + textToInsert + after;
   output.value = newValue;
-  // posiciona cursor logo após o texto inserido
   const newPos = before.length + textToInsert.length;
   output.setSelectionRange(newPos, newPos);
   output.focus();
@@ -451,7 +420,6 @@ if(SpeechRecognition){
       else interim += t;
     }
 
-    // mostrar interim na overlay (apenas visual)
     if(interim && interim.trim()){
       lastInterim = interim.trim();
       showOverlay(lastInterim, true);
@@ -464,23 +432,17 @@ if(SpeechRecognition){
     if(final && final.trim()){
       let finalText = final.trim();
 
-      // aplicar opção de pontuação automática (se desligada, remover pontuação)
       if(!autoPunct.checked){
         finalText = stripPunctuation(finalText);
       }
 
-      // determinar posição de inserção atual (cursor)
-      // usamos a posição atual do cursor no momento do recebimento do final
-      const insertPos = output.selectionStart || output.value.length;
+      // determine insertion position at the moment final arrives
+      const insertPos = output.selectionStart != null ? output.selectionStart : output.value.length;
 
-      // aplicar regras de capitalização e caixa alta
       finalText = applyCapitalizationRules(finalText, insertPos);
 
-      // se allCaps ativado, já transformado; caso contrário, manter finalText
-      // inserir no cursor (substitui seleção)
       insertAtCursor(finalText);
 
-      // atualizar nota atual / salvar
       if(currentNoteIndex !== null && notes[currentNoteIndex]){
         notes[currentNoteIndex].text = output.value;
         notes[currentNoteIndex].t = Date.now();
@@ -493,7 +455,6 @@ if(SpeechRecognition){
       pushHistory(output.value);
       scheduleAutoSave();
 
-      // limpar estado interim e overlay
       lastInterim = '';
       hideOverlay();
     }
