@@ -379,12 +379,21 @@ function applyCapitalizationRules(finalText, insertPos){
   }
 }
 
-/* ====== Inserção no cursor ====== */
+/* ====== Inserção no cursor (garante espaço após pontuação) ====== */
 function insertAtCursor(textToInsert){
   const start = output.selectionStart;
   const end = output.selectionEnd;
   const before = output.value.slice(0, start);
   const after = output.value.slice(end);
+
+  // Se o caractere anterior é pontuação final e não há espaço entre ele e o que será inserido,
+  // e o próximo caractere no documento (na posição de inserção) não é espaço, insere um espaço.
+  const prevChar = before.slice(-1);
+  const nextChar = output.value.charAt(start) || '';
+  if(/[.!?]/.test(prevChar) && nextChar !== ' ' && textToInsert.charAt(0) !== ' '){
+    textToInsert = ' ' + textToInsert;
+  }
+
   const newValue = before + textToInsert + after;
   output.value = newValue;
   const newPos = before.length + textToInsert.length;
@@ -437,10 +446,12 @@ if(SpeechRecognition){
       }
 
       // determine insertion position at the moment final arrives
-      const insertPos = output.selectionStart != null ? output.selectionStart : output.value.length;
+      const insertPos = (typeof output.selectionStart === 'number') ? output.selectionStart : output.value.length;
 
+      // apply capitalization rules
       finalText = applyCapitalizationRules(finalText, insertPos);
 
+      // ensure space after punctuation if needed is handled inside insertAtCursor
       insertAtCursor(finalText);
 
       if(currentNoteIndex !== null && notes[currentNoteIndex]){
