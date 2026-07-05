@@ -5,10 +5,9 @@
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>Bloco de Notas com Ditado (PWA)</title>
 
-<!-- Manifest PWA (aponta para manifest.json local) -->
 <link rel="manifest" href="manifest.json">
 
-<!-- Favicon embutido (data URI) — não precisa de arquivo local -->
+<!-- favicon embutido (data URI) -->
 <link rel="icon" type="image/svg+xml" href='data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect rx="64" width="512" height="512" fill="%230b5cff"/><g transform="translate(64,64)" fill="%23fff"><rect x="0" y="0" width="384" height="48" rx="8"/><rect x="0" y="72" width="384" height="240" rx="12"/><rect x="0" y="336" width="384" height="48" rx="8"/><circle cx="320" cy="264" r="28" fill="%230b5cff"/></g></svg>'>
 
 <meta name="theme-color" content="#0b5cff">
@@ -72,7 +71,7 @@
       <button id="copyBtn" title="F4 para copiar">📋 Copiar (F4)</button>
       <button id="undoBtn" title="Ctrl+U">↩️ Desfazer (Ctrl+U)</button>
       <button id="redoBtn" title="Ctrl+Y">↪️ Refazer (Ctrl+Y)</button>
-      <button id="newBtn" title="Ctrl+N">📝 Nova Nota (Ctrl+N)</button>
+      <button id="newBtn" title="F9 para nova nota">📝 Nova Nota (F9)</button>
       <button id="clearBtn" class="warn" title="Ctrl+L">🧹 Limpar (Ctrl+L)</button>
 
       <div id="fontControls" aria-hidden="false">
@@ -245,7 +244,6 @@ function pushHistory(value){
   if(history.length && history[history.length-1] === value) return;
   history.push(value);
   if(history.length > HISTORY_LIMIT) history.shift();
-  // ao empurrar novo estado, limpar redo
   redoStack = [];
 }
 function undo(){
@@ -502,10 +500,9 @@ output.addEventListener('input', (e) => {
 
 /* ====== Atalhos de teclado ====== */
 window.addEventListener('keydown', (e) => {
-  // Bloquear comportamento padrão do navegador para Ctrl+N (nova janela) e garantir nova nota
-  if(e.ctrlKey && (e.key === 'n' || e.key === 'N')){
+  // F9 -> nova nota (evita conflito com navegadores)
+  if(e.key === 'F9'){
     e.preventDefault();
-    e.stopImmediatePropagation();
     newNote();
     return;
   }
@@ -520,6 +517,12 @@ window.addEventListener('keydown', (e) => {
   if((e.ctrlKey && (e.key === 'y' || e.key === 'Y')) || (e.ctrlKey && e.shiftKey && (e.key === 'Z'))){
     e.preventDefault();
     redo();
+    return;
+  }
+  // Interceptar Ctrl+N para evitar abrir nova janela do navegador; redireciona para nova nota
+  if(e.ctrlKey && (e.key === 'n' || e.key === 'N')){
+    e.preventDefault();
+    newNote();
     return;
   }
   // Ctrl+L -> limpar editor
