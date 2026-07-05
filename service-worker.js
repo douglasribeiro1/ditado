@@ -4,7 +4,6 @@ const ASSETS = [
   '.',
   './ditado.html',
   './manifest.json'
-  // não há arquivos de ícone locais; manifest usa data URI / links externos
 ];
 
 self.addEventListener('install', (event) => {
@@ -30,7 +29,6 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Strategy: cache-first for app shell, network fallback; cache new GET same-origin responses
   event.respondWith(
     caches.match(event.request).then((cached) => {
       if (cached) return cached;
