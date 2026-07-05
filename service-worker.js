@@ -1,13 +1,10 @@
 // service-worker.js
-const CACHE_NAME = 'ditado-cache-v1';
+const CACHE_NAME = 'ditado-cache-v2';
 const ASSETS = [
   '.',
   './ditado.html',
-  './manifest.json',
-  './icons/icon.svg',
-  './icons/icon-192.png',
-  './icons/icon-512.png',
-  // adicione outros arquivos estáticos que queira cachear
+  './manifest.json'
+  // não há arquivos de ícone locais; manifest usa data URI / links externos
 ];
 
 self.addEventListener('install', (event) => {
@@ -33,12 +30,14 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Strategy: try cache first, then network; fallback to network if not cached
+  // Strategy: cache-first for app shell, network fallback; cache new GET same-origin responses
   event.respondWith(
     caches.match(event.request).then((cached) => {
       if (cached) return cached;
       return fetch(event.request).then((response) => {
-        // Optionally cache new requests (only for same-origin and GET)
+        if (!response || response.status !== 200 || response.type === 'opaque') {
+          return response;
+        }
         if (event.request.method === 'GET' && event.request.url.startsWith(self.location.origin)) {
           caches.open(CACHE_NAME).then((cache) => {
             cache.put(event.request, response.clone()).catch(()=>{});
@@ -46,7 +45,6 @@ self.addEventListener('fetch', (event) => {
         }
         return response;
       }).catch(() => {
-        // network failed; optionally return a fallback page or image
         return caches.match('./ditado.html');
       });
     })
