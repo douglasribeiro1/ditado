@@ -16,8 +16,35 @@
   :root{--controls-height:60px;--notes-panel-width:360px;--font-size:22px;}
   html,body{height:100%;margin:0;font-family:Arial, Helvetica, sans-serif;background:#f6f7f9;color:#111;overflow:hidden;}
   #app{display:flex;flex-direction:column;height:100vh;box-sizing:border-box;}
-  #controls{height:var(--controls-height);display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid #e6e6e6;background:#fff;box-sizing:border-box;}
-  .controls-left{display:flex;gap:8px;align-items:center;} .controls-right{margin-left:auto;display:flex;gap:8px;align-items:center;}
+  #controls {
+  height: var(--controls-height);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid #e6e6e6;
+  background: #fff;
+  box-sizing: border-box;
+  /* Permitir rolagem horizontal caso os botões não caibam */
+  overflow-x: auto;
+  white-space: nowrap;
+  -webkit-overflow-scrolling: touch;
+}
+.controls-left {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  /* Impede os botões de encolherem ou deformarem */
+  flex-shrink: 0;
+} 
+.controls-right {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  /* Impede as opções de encolherem ou deformarem */
+  flex-shrink: 0;
+}
   button{padding:8px 12px;font-size:15px;border-radius:6px;border:1px solid #cfcfcf;background:#fff;cursor:pointer;}
   button.primary{background:#0b5cff;color:#fff;border-color:#0b5cff;} button.warn{background:#111;color:#fff;border-color:#111;}
   #fontControls{display:flex;align-items:center;gap:6px;} input[type="range"]{width:120px;}
