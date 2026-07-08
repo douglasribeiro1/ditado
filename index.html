@@ -426,7 +426,10 @@ if(SpeechRecognition){
     lastInterim = '';
   };
 
-  recognition.onresult = (e) => {
+recognition.onresult = (e) => {
+    // 1. SALVA A ROLAGEM ATUAL NO INÍCIO DE TUDO
+    const salvoScrollTop = output.scrollTop;
+
     let interim = '';
     let final = '';
     for(let i = e.resultIndex; i < e.results.length; i++){
@@ -491,9 +494,12 @@ if(SpeechRecognition){
       lastInterim = '';
       hideOverlay();
     }
-    output.scrollTop = output.scrollHeight;
+    
+    // 2. LINHA ANTIGA REMOVIDA (output.scrollTop = output.scrollHeight;)
+    // 3. RESTAURA A TELA EXATAMENTE ONDE VOCÊ ESTAVA LENDO/EDITANDO
+    output.scrollTop = salvoScrollTop;
   };
-
+  
   recognition.onerror = (ev) => {
     console.error('Speech error', ev);
     status.textContent = 'Erro no microfone';
