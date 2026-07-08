@@ -7,7 +7,6 @@
 
 <link rel="manifest" href="manifest.json">
 
-<!-- favicon embutido (data URI) -->
 <link rel="icon" type="image/svg+xml" href='data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect rx="64" width="512" height="512" fill="%230b5cff"/><g transform="translate(64,64)" fill="%23fff"><rect x="0" y="0" width="384" height="48" rx="8"/><rect x="0" y="72" width="384" height="240" rx="12"/><rect x="0" y="336" width="384" height="48" rx="8"/><circle cx="320" cy="264" r="28" fill="%230b5cff"/></g></svg>'>
 
 <meta name="theme-color" content="#0b5cff">
@@ -48,7 +47,7 @@
       <button id="undoBtn" title="Ctrl+U">↩️ Desfazer (Ctrl+U)</button>
       <button id="redoBtn" title="Ctrl+Y">↪️ Refazer (Ctrl+Y)</button>
       <button id="newBtn" title="F9 para nova nota">📝 Nova Nota (F9)</button>
-      <button id="clearBtn" class="warn" title="Ctrl+L">🧹 Limpar (Ctrl+L)</button>
+      <button id="clearBtn" class="warn" title="F8 para limpar">🧹 Limpar (F8)</button>
 
       <div id="fontControls" aria-hidden="false">
         <label for="fontRange" class="small" style="margin-left:8px;">Tamanho</label>
@@ -69,7 +68,7 @@
         <span>Caixa alta</span>
       </label>
 
-      <button id="notesToggle" title="Ctrl+M">📚 Notas (Ctrl+M)</button>
+      <button id="notesToggle" title="F2 para notas">📚 Notas (F2)</button>
       <div id="status" aria-live="polite">Pronto</div>
     </div>
   </div>
@@ -92,14 +91,12 @@
   </div>
 </div>
 
-<!-- Overlay de ditado -->
 <div id="dictateOverlay" aria-hidden="true">
   <div class="text" id="overlayText" aria-live="polite"></div>
   <div class="hint" id="overlayHint">Aguardando texto final</div>
   <div class="spinner" id="overlaySpinner" style="display:none"></div>
 </div>
 
-<!-- Toast central -->
 <div id="toast" role="status" aria-live="polite" aria-atomic="true">Copiado</div>
 
 <script>
@@ -491,7 +488,7 @@ if(SpeechRecognition){
       lastInterim = '';
       hideOverlay();
     }
-    output.scrollTop = output.scrollHeight;
+    // BUG REMOVIDO: A linha 'output.scrollTop = output.scrollHeight;' foi retirada daqui para respeitar a posição do cursor.
   };
 
   recognition.onerror = (ev) => {
@@ -545,10 +542,24 @@ output.addEventListener('input', (e) => {
 
 /* ====== Atalhos de teclado ====== */
 window.addEventListener('keydown', (e) => {
-  // F9 -> nova nota (evita conflito com navegadores)
+  // F9 -> nova nota
   if(e.key === 'F9'){
     e.preventDefault();
     newNote();
+    return;
+  }
+
+  // F2 -> Abrir/Fechar Notas (Substitui o Ctrl+M que gerava conflitos)
+  if(e.key === 'F2'){
+    e.preventDefault();
+    toggleNotes();
+    return;
+  }
+
+  // F8 -> Limpar Editor (Substitui o Ctrl+L que limpava a barra do navegador)
+  if(e.key === 'F8'){
+    e.preventDefault();
+    clearEditor();
     return;
   }
 
@@ -570,10 +581,6 @@ window.addEventListener('keydown', (e) => {
     newNote();
     return;
   }
-  // Ctrl+L -> limpar editor
-  if(e.ctrlKey && (e.key === 'l' || e.key === 'L')){ e.preventDefault(); clearEditor(); return; }
-  // Ctrl+M -> abrir/fechar painel de notas
-  if(e.ctrlKey && (e.key === 'm' || e.key === 'M')){ e.preventDefault(); toggleNotes(); return; }
   // Ctrl+Shift+Delete -> excluir todas as notas
   if(e.ctrlKey && e.shiftKey && e.key === 'Delete'){ e.preventDefault(); deleteAllNotes(); return; }
 });
