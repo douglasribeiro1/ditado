@@ -405,25 +405,50 @@ function insertAtCursor(textToInsert){
 }
 
 /* ====== SpeechRecognition e overlay ====== */
-const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
 let recognition = null;
 let recognizing = false;
+let userWantsRecording = false;
+let reconnectTimer = null;
+let reconnectAttempts = 0;
+const MAX_RECONNECT = 5;
 
-if(SpeechRecognition){
-  recognition = new SpeechRecognition();
-  recognition.lang = 'pt-BR';
-  recognition.interimResults = true;
-  recognition.continuous = true;
-
-  recognition.onstart = () => {
-    recognizing = true;
+function setMicState(state){
+  // states: 'idle' | 'recording' | 'reconnecting' | 'error'
+  micBtn.disabled = false;
+  if(state === 'recording'){
     micBtn.textContent = '⏹ Parar (Esc)';
+    micBtn.style.background = '#c0392b';
+    micBtn.style.borderColor = '#c0392b';
+  } else if(state === 'reconnecting'){
+    micBtn.textContent = '⏳ Reconectando…';
+    micBtn.style.background = '#d4830a';
+    micBtn.style.borderColor = '#d4830a';
+    micBtn.disabled = true;
+  } else {
+    micBtn.textContent = '🎤 Iniciar (Esc)';
+    micBtn.style.background = '#0b5cff';
+    micBtn.style.borderColor = '#0b5cff';
+  }
+}
+
+function buildRecognition(){
+  if(!SpeechRecognitionAPI) return null;
+  const r = new SpeechRecognitionAPI();
+  r.lang = 'pt-BR';
+  r.interimResults = true;
+  r.continuous = true;
+
+  r.onstart = () => {
+    recognizing = true;
+    reconnectAttempts = 0;
+    setMicState('recording');
     status.textContent = 'Gravando...';
     showOverlay('', true);
     lastInterim = '';
   };
 
-  recognition.onresult = (e) => {
+  r.onresult = (e) => {
     let interim = '';
     let final = '';
     for(let i = e.resultIndex; i < e.results.length; i++){
@@ -444,19 +469,14 @@ if(SpeechRecognition){
     if(final && final.trim()){
       let finalText = final.trim();
 
-      // Remove pontuação gerada pelo reconhecimento se a pontuação automática estiver desligada
       if(!autoPunct.checked){
         finalText = stripPunctuation(finalText);
       }
 
-      // Determina a posição de inserção no cursor no momento de chegada do texto final
       const insertPos = (typeof output.selectionStart === 'number') ? output.selectionStart : output.value.length;
       const before = output.value.slice(0, insertPos);
-
-      // Executa a análise inteligente de contexto (pontuações manuais ou automáticas anteriores)
       const context = analyzeInsertionContext(before);
 
-      // Aplica as regras de capitalização obtidas pela análise
       if(allCaps.checked){
         finalText = finalText.toUpperCase();
       } else {
@@ -467,10 +487,7 @@ if(SpeechRecognition){
         }
       }
 
-      // Adiciona o espaçamento inteligente adequado antes de inserir
       finalText = context.prefixAppend + finalText;
-
-      // Realiza a inserção no campo de texto
       insertAtCursor(finalText);
 
       if(currentNoteIndex !== null && notes[currentNoteIndex]){
@@ -488,30 +505,105 @@ if(SpeechRecognition){
       lastInterim = '';
       hideOverlay();
     }
-    // BUG REMOVIDO: A linha 'output.scrollTop = output.scrollHeight;' foi retirada daqui para respeitar a posição do cursor.
   };
 
-  recognition.onerror = (ev) => {
-    console.error('Speech error', ev);
-    status.textContent = 'Erro no microfone';
-    setTimeout(()=> status.textContent = 'Pronto', 1200);
-    lastInterim = '';
-    hideOverlay();
-  };
-
-  recognition.onend = () => {
+  r.onerror = (ev) => {
+    console.error('Speech error', ev.error, ev);
     recognizing = false;
-    micBtn.textContent = '🎤 Iniciar (Esc)';
-    status.textContent = 'Pronto';
     lastInterim = '';
     hideOverlay();
+
+    if(ev.error === 'not-allowed' || ev.error === 'service-not-allowed'){
+      userWantsRecording = false;
+      setMicState('idle');
+      status.textContent = 'Permissão de microfone negada';
+      setTimeout(()=> status.textContent = 'Pronto', 3000);
+      return;
+    }
+
+    if(ev.error === 'no-speech'){
+      // Edge fires this often; treat as a normal end and attempt reconnect below
+    } else {
+      status.textContent = 'Erro no microfone (' + ev.error + ')';
+      setTimeout(()=> status.textContent = recognizing ? 'Gravando...' : 'Pronto', 1500);
+    }
+
+    if(userWantsRecording) scheduleReconnect();
   };
+
+  r.onend = () => {
+    recognizing = false;
+    lastInterim = '';
+    hideOverlay();
+
+    if(userWantsRecording){
+      scheduleReconnect();
+    } else {
+      setMicState('idle');
+      status.textContent = 'Pronto';
+    }
+  };
+
+  return r;
+}
+
+function scheduleReconnect(){
+  if(reconnectAttempts >= MAX_RECONNECT){
+    userWantsRecording = false;
+    setMicState('idle');
+    status.textContent = 'Microfone parou. Clique para reiniciar.';
+    setTimeout(()=> status.textContent = 'Pronto', 3000);
+    return;
+  }
+  reconnectAttempts++;
+  setMicState('reconnecting');
+  status.textContent = 'Reconectando…';
+  clearTimeout(reconnectTimer);
+  reconnectTimer = setTimeout(()=> {
+    if(!userWantsRecording) return;
+    recognition = buildRecognition();
+    try{
+      recognition.start();
+    } catch(e){
+      console.warn('Reconexão falhou:', e);
+      scheduleReconnect();
+    }
+  }, 400);
+}
+
+if(SpeechRecognitionAPI){
+  recognition = buildRecognition();
 } else {
   micBtn.disabled = true;
   status.textContent = 'SpeechRecognition não suportado';
 }
 
-function toggleMic(){ if(!recognition) return; if(!recognizing){ try{ recognition.start(); }catch(e){ console.warn(e); } } else { recognition.stop(); } }
+function toggleMic(){
+  if(!SpeechRecognitionAPI) return;
+  if(!userWantsRecording){
+    userWantsRecording = true;
+    reconnectAttempts = 0;
+    clearTimeout(reconnectTimer);
+    recognition = buildRecognition();
+    try{
+      recognition.start();
+    } catch(e){
+      console.warn('Falha ao iniciar:', e);
+      userWantsRecording = false;
+      setMicState('idle');
+      status.textContent = 'Não foi possível iniciar o microfone';
+      setTimeout(()=> status.textContent = 'Pronto', 2000);
+    }
+  } else {
+    userWantsRecording = false;
+    clearTimeout(reconnectTimer);
+    recognizing = false;
+    setMicState('idle');
+    status.textContent = 'Pronto';
+    hideOverlay();
+    try{ recognition.stop(); } catch(e){}
+  }
+}
 
 /* ====== Overlay helpers ====== */
 function showOverlay(text, showSpinner){
